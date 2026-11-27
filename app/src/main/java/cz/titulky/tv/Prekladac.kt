@@ -24,6 +24,8 @@ import java.util.concurrent.Executors
  */
 class Prekladac(context: android.content.Context? = null, cilovy: String = "cs") {
 
+    init { context?.let { Gemini.init(it) } }
+
     /** Cílový jazyk překladu (kód: cs, sk, de, pl, fr, es, it). */
     @Volatile var cil: String = cilovy
         private set
@@ -119,8 +121,11 @@ class Prekladac(context: android.content.Context? = null, cilovy: String = "cs")
             val ted = System.currentTimeMillis()
             var vysledek: String? = null
             var odkud = ""
+            // 0) Gemini (ak je zadaný kľúč) – preklad s kontextom hry
+            vysledek = runCatching { Gemini.preloz(vstup, cil) }.getOrNull()
+            if (!vysledek.isNullOrBlank()) odkud = "gemini"
             // 1) Google – 2 pokusy (udržované spojení mohl Google mezitím zavřít)
-            if (ted >= googlePauzaDo) {
+            if (vysledek.isNullOrBlank() && ted >= googlePauzaDo) {
                 vysledek = runCatching { google(vstup) }.getOrNull() ?: runCatching { google(vstup) }.getOrNull()
                 if (vysledek.isNullOrBlank()) { googlePauzaDo = ted + 30_000L; chybGooglu++ } else odkud = "google"
             }
