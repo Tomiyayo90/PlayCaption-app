@@ -338,7 +338,7 @@ class TelefonActivity : Activity() {
             text = "⚙ " + t("tvNastaveni") + " · " + Propojeni.Vysilac.cilJmeno
             textSize = 16f
             setTextColor(Color.WHITE)
-            background = zaobleni(Color.parseColor("#333338"))
+            background = zaobleni(Color.parseColor("#1F2D4D"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setOnClickListener { spravaTelevize() }
         })
@@ -348,14 +348,14 @@ class TelefonActivity : Activity() {
         obal.addView(TextView(this).apply {
             text = t("tvUpravit")
             textSize = 14f
-            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextColor(Color.parseColor("#8FA3C7"))
             setPadding(0, 0, 0, dp(6))
         })
         val obrazovka = FrameLayout(this).apply {
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#1A1C26"))
+                setColor(Color.parseColor("#111A30"))
                 cornerRadius = 10 * resources.displayMetrics.density
-                setStroke(dp(2), Color.parseColor("#555A78"))
+                setStroke(dp(2), Color.parseColor("#4B5F8A"))
             }
         }
         val box = TextView(this).apply {
@@ -503,7 +503,7 @@ class TelefonActivity : Activity() {
         fun sedaNapoveda(text: String) = obal.addView(TextView(this).apply {
             this.text = text
             textSize = 13f
-            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextColor(Color.parseColor("#8FA3C7"))
             setPadding(dp(4), dp(6), 0, 0)
         })
 
@@ -666,7 +666,7 @@ class TelefonActivity : Activity() {
         if (Volby.zapnuto) {
             val radekRezim = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                background = GradientDrawable().apply { cornerRadius = 999f; setColor(Color.parseColor("#333338")) }
+                background = GradientDrawable().apply { cornerRadius = 999f; setColor(Color.parseColor("#1F2D4D")) }
                 setPadding(dp(2), dp(2), dp(2), dp(2))
             }
             fun rezim(popis: String, text: Boolean) = TextView(this).apply {
@@ -702,7 +702,7 @@ class TelefonActivity : Activity() {
                 setTextColor(if (Volby.ukazatNaTv) Color.BLACK else Color.WHITE)
                 background = GradientDrawable().apply {
                     cornerRadius = 999f
-                    if (Volby.ukazatNaTv) setColor(Volby.ZLUTA) else { setColor(Color.TRANSPARENT); setStroke(dp(1), Color.parseColor("#888888")) }
+                    if (Volby.ukazatNaTv) setColor(Volby.ZLUTA) else { setColor(Color.TRANSPARENT); setStroke(dp(1), Color.parseColor("#8FA3C7")) }
                 }
                 setPadding(dp(14), dp(8), dp(14), dp(8))
                 setOnClickListener {
@@ -734,7 +734,7 @@ class TelefonActivity : Activity() {
         obal.addView(TextView(this).apply {
             text = t("tvVychozi")
             textSize = 13f
-            setTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#8FA3C7"))
             setPadding(0, dp(8), 0, 0)
             setOnClickListener {
                 rozvrh = floatArrayOf(0.5f, 0.93f, 0.62f, 1f)
@@ -779,14 +779,14 @@ class TelefonActivity : Activity() {
         tecka = View(this).apply { background = zaobleni(Color.GRAY) }
         stav = TextView(this).apply {
             textSize = 13f
-            setTextColor(Color.parseColor("#BBBBBB"))
+            setTextColor(Color.parseColor("#A9B8D6"))
         }
         val zastavit = TextView(this).apply {
             text = t("zastavit")
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
-            background = zaobleni(Color.parseColor("#E5091A"))
+            background = zaobleni(Color.parseColor("#3B82F6"))
             setPadding(dp(14), dp(7), dp(14), dp(7))
             setOnClickListener { finish() }
         }
@@ -803,7 +803,7 @@ class TelefonActivity : Activity() {
         segTel = segment(t("segTel")) { prepniNaTelefon() }
         tvTlacitko = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = zaobleni(Color.parseColor("#333338"))
+            background = zaobleni(Color.parseColor("#1F2D4D"))
             setPadding(dp(2), dp(2), dp(2), dp(2))
             addView(segTv)
             addView(segTel)
@@ -863,7 +863,7 @@ class TelefonActivity : Activity() {
                 textSize = 14f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.WHITE)
-                background = zaobleni(Color.parseColor("#E5091A"))
+                background = zaobleni(Color.parseColor("#3B82F6"))
                 setPadding(dp(14), dp(6), dp(14), dp(6))
                 visibility = View.GONE
                 setOnClickListener { RemotePlayService.prepni(this@TelefonActivity, naXbox = !RemotePlayService.naXboxu) }
@@ -873,7 +873,7 @@ class TelefonActivity : Activity() {
         val horni = LinearLayout(this).apply {
             horniPanel = this
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#111114"))
+            setBackgroundColor(Color.parseColor("#0A1020"))
             addView(lista, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             val rezimy = LinearLayout(this@TelefonActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -891,8 +891,8 @@ class TelefonActivity : Activity() {
                     button.typeface = Typeface.DEFAULT_BOLD
                     button.minHeight = dp(48)
                     button.setTextColor(if (vybrano) Color.BLACK else Color.WHITE)
-                    button.background = zaobleni(Color.parseColor(if (vybrano) "#3CFF6E" else "#303038")).apply {
-                        setStroke(dp(2), Color.parseColor(if (vybrano) "#3CFF6E" else "#737380"))
+                    button.background = zaobleni(Color.parseColor(if (vybrano) "#3CFF6E" else "#1F2D4D")).apply {
+                        setStroke(dp(2), Color.parseColor(if (vybrano) "#3CFF6E" else "#6F84AA"))
                     }
                     button.elevation = dp(2).toFloat()
                 }
@@ -919,7 +919,7 @@ class TelefonActivity : Activity() {
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40)))
             casObal.addView(TextView(this@TelefonActivity).apply {
                 text = "100 % = výchozí čas · méně % = kratší zobrazení. Platí od další stránky."
-                textSize = 12f; setTextColor(Color.parseColor("#B6B6C2"))
+                textSize = 12f; setTextColor(Color.parseColor("#8FA3C7"))
             })
             rezimy.addView(tlacitka)
             rezimy.addView(casObal)

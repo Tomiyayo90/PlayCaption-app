@@ -78,7 +78,7 @@ class SamsungPruvodce(private val activity: Activity, private val vyhledej: () -
         minimumHeight = dp(52)
         setPadding(dp(18), dp(12), dp(18), dp(12))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor(if (hlavni) "#E5091A" else "#33343E"))
+            setColor(Color.parseColor(if (hlavni) "#3B82F6" else "#1F2D4D"))
             cornerRadius = dp(14).toFloat()
         }
         isFocusable = true
@@ -90,7 +90,7 @@ class SamsungPruvodce(private val activity: Activity, private val vyhledej: () -
         val koren = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             keepScreenOn = true
-            setBackgroundColor(Color.parseColor("#0B0B0E"))
+            setBackgroundColor(Color.parseColor("#070B16"))
             setPadding(dp(24), dp(24), dp(24), dp(20))
         }
         val hlavicka = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -98,7 +98,7 @@ class SamsungPruvodce(private val activity: Activity, private val vyhledej: () -
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         hlavicka.addView(tlacitko(t("lgZavrit")) { dialog.dismiss() })
         koren.addView(hlavicka)
-        koren.addView(text(t("smKrok").replace("{n}", (stav.krok + 1).toString()), 14f, Color.parseColor("#B2B3BF")).apply {
+        koren.addView(text(t("smKrok").replace("{n}", (stav.krok + 1).toString()), 14f, Color.parseColor("#8FA3C7")).apply {
             setPadding(0, dp(18), 0, dp(12))
         })
         val obsah = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 0, 0, dp(20)) }
@@ -125,7 +125,7 @@ class SamsungPruvodce(private val activity: Activity, private val vyhledej: () -
             }
             3 -> {
                 radek(text(vysledek(), 17f, Color.parseColor(when {
-                    hledam || nalezene == null -> "#B2B3BF"
+                    hledam || nalezene == null -> "#8FA3C7"
                     nalezene!!.isEmpty() -> "#FF9191"
                     else -> "#3CFF6E"
                 })))

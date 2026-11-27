@@ -48,12 +48,12 @@ class MainActivity : Activity() {
     private fun t(klic: String) = Texty.t(jazyk, klic)
 
     // barvy
-    private val CERNA = Color.parseColor("#0B0B0E")
-    private val KARTA = Color.parseColor("#1A1A21")
-    private val CERVENA = Color.parseColor("#E5091A")
+    private val CERNA = Color.parseColor("#070B16")
+    private val KARTA = Color.parseColor("#111A30")
+    private val CERVENA = Color.parseColor("#3B82F6")
     private val ZELENA = Color.parseColor("#14A23C")
-    private val SEDA = Color.parseColor("#3A3A44")
-    private val TEXT2 = Color.parseColor("#A8A8B3")
+    private val SEDA = Color.parseColor("#1F2D4D")
+    private val TEXT2 = Color.parseColor("#8FA3C7")
 
     companion object {
         /** QR Platba na příspěvky (bez částky – každý si zvolí sám). Prázdné = karta se neukáže. */
@@ -126,13 +126,13 @@ class MainActivity : Activity() {
         obrazovka = "uvod"
         val bar = View(this).apply { setBackgroundColor(CERVENA) }
         val drazka = FrameLayout(this).apply {
-            background = zaobleni(Color.parseColor("#26262E"), 999f)
+            background = zaobleni(Color.parseColor("#16213B"), 999f)
             addView(bar, FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         val koren = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.BLACK)
+            background = Tema.pozadie()
             addView(ImageView(this@MainActivity).apply {
                 setImageResource(R.drawable.logo)
                 adjustViewBounds = true
@@ -226,7 +226,7 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(26) })
         }
         val koren = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
+            background = Tema.pozadie()
             setPadding(dp(24), dp(24), dp(24), dp(24))
             addView(stred, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(betaZnacka(), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END))
@@ -380,7 +380,7 @@ class MainActivity : Activity() {
                     gravity = Gravity.CENTER
                     background = StateListDrawable().apply {
                         addState(intArrayOf(android.R.attr.state_focused), zaobleni(CERVENA, 16f, Color.WHITE))
-                        addState(intArrayOf(), zaobleni(CERVENA, 16f, Color.parseColor("#FF9AA0")))
+                        addState(intArrayOf(), zaobleni(CERVENA, 16f, Color.parseColor("#93C5FD")))
                     }
                     setPadding(dp(24), dp(14), dp(24), dp(14))
                 }
@@ -607,7 +607,7 @@ class MainActivity : Activity() {
 
             // "Jak chceš hrát?" – dvě velké volby; doporučená (S telefonem) první
             val slaba = jeSlabaTv()
-            dlazdiceTel = dlazdice("📱➜📺", t("hratTel"), if (slaba) t("hratTelDoporuceno") else t("hratTelPopis"), Color.parseColor("#2A2C3E")) { hratSTelefonem() }
+            dlazdiceTel = dlazdice("📱➜📺", t("hratTel"), if (slaba) t("hratTelDoporuceno") else t("hratTelPopis"), Color.parseColor("#1B2744")) { hratSTelefonem() }
             dlazdiceTv = dlazdice("📺", t("hratTv"), if (slaba) t("hratTvSlaba") else t("hratTvPopis"), CERVENA) {
                 if (slaba) varovaniSlabaTv() else hratTelevizi()
             }
@@ -704,10 +704,10 @@ class MainActivity : Activity() {
         stav.text = if (telefon) popis.replaceFirstChar { it.uppercase() } else "· $popis"
         when (druh) {
             "ready" -> { radek.background = zaobleni(ZELENA_TMAVA, 14f, ZELENA_RAMECEK); stav.setTextColor(ZELENA_SVETLA); jmeno?.setTextColor(Color.WHITE) }
-            "wait" -> { radek.background = zaobleni(Color.parseColor("#22232C"), 14f, Color.parseColor("#7322C55E")); stav.setTextColor(Color.parseColor("#9FE8B4")); jmeno?.setTextColor(Color.WHITE) }
+            "wait" -> { radek.background = zaobleni(Color.parseColor("#16213B"), 14f, Color.parseColor("#7322C55E")); stav.setTextColor(Color.parseColor("#9FE8B4")); jmeno?.setTextColor(Color.WHITE) }
             "chyba" -> { radek.background = zaobleni(Color.parseColor("#2A1214"), 14f, Color.parseColor("#FF4A50")); stav.setTextColor(CERVENA_SVETLA); jmeno?.setTextColor(Color.WHITE) }
-            "neutral" -> { radek.background = zaobleni(Color.parseColor("#22232C"), 14f); stav.setTextColor(TEXT2); jmeno?.setTextColor(Color.WHITE) }
-            else -> { radek.background = zaobleni(Color.parseColor("#22232C"), 14f); stav.setTextColor(Color.parseColor("#8A8A96")); jmeno?.setTextColor(Color.parseColor("#8A8A96")) }
+            "neutral" -> { radek.background = zaobleni(Color.parseColor("#16213B"), 14f); stav.setTextColor(TEXT2); jmeno?.setTextColor(Color.WHITE) }
+            else -> { radek.background = zaobleni(Color.parseColor("#16213B"), 14f); stav.setTextColor(Color.parseColor("#8FA3C7")); jmeno?.setTextColor(Color.parseColor("#8FA3C7")) }
         }
         stav.typeface = if (druh == "off" || druh == "neutral") Typeface.DEFAULT else Typeface.DEFAULT_BOLD
     }
@@ -757,7 +757,7 @@ class MainActivity : Activity() {
     private fun tlacitkoSede(s: String, akce: () -> Unit) = tlacitko(s, pismo(14f, 18f), akce).apply {
         maxLines = 1
         gravity = Gravity.CENTER
-        background = vyber(Color.parseColor("#2A2B36"), radius = 999f)
+        background = vyber(Color.parseColor("#1B2744"), radius = 999f)
         setPadding(dp(18), dp(9), dp(18), dp(9))
     }
 
@@ -814,7 +814,7 @@ class MainActivity : Activity() {
             UrovenSpojeni.OK -> Triple(ZELENA_TMAVA, ZELENA_RAMECEK, ZELENA_SVETLA)
             UrovenSpojeni.CEKANI -> Triple(Color.parseColor("#14171A"), Color.parseColor("#8022C55E"), Color.WHITE)
             UrovenSpojeni.CHYBA -> Triple(Color.parseColor("#3A1012"), Color.parseColor("#FF4A50"), CERVENA_SVETLA)
-            else -> Triple(KARTA, Color.parseColor("#3A3A44"), Color.WHITE)
+            else -> Triple(KARTA, Color.parseColor("#1F2D4D"), Color.WHITE)
         }
         fun nastavBarvy(p: Int, r: Int, n: Int) {
             stavText.setTextColor(n)
@@ -855,7 +855,7 @@ class MainActivity : Activity() {
             when (uroven) {
                 UrovenSpojeni.OK -> { text = "✓"; background = zaobleni(ZELENA_SVETLA, 999f); setTextColor(ZELENA_TMAVA) }
                 UrovenSpojeni.CHYBA -> { text = "!"; background = zaobleni(Color.parseColor("#FF4A50"), 999f); setTextColor(Color.parseColor("#3A1012")) }
-                else -> { text = ""; background = zaobleni(Color.parseColor("#6A6A76"), 999f) }
+                else -> { text = ""; background = zaobleni(Color.parseColor("#6F84AA"), 999f) }
             }
         }
         // výplň: při připojování se pomalu plní průhledně zeleně, po připojení se doplní a pruh zezelená
@@ -935,7 +935,7 @@ class MainActivity : Activity() {
         // obě volby stejně tmavé; ta, na které je ovladač, se rozsvítí (červeně + bílý rámeček) a trochu zvětší
         background = StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_focused), zaobleni(CERVENA, 26f, Color.WHITE))
-            addState(intArrayOf(), zaobleni(Color.parseColor("#2A2C3E"), 26f, Color.parseColor("#3A3D55")))
+            addState(intArrayOf(), zaobleni(Color.parseColor("#1B2744"), 26f, Color.parseColor("#3A3D55")))
         }
         setPadding(dp(24), dp(20), dp(24), dp(20))
         isFocusable = true
@@ -1482,7 +1482,7 @@ class MainActivity : Activity() {
             inputType = InputType.TYPE_CLASS_NUMBER
             imeOptions = EditorInfo.IME_ACTION_DONE
             setSingleLine()
-            background = vyber(Color.parseColor("#26262E"), CERVENA)
+            background = vyber(Color.parseColor("#16213B"), CERVENA)
             setPadding(dp(18), dp(10), dp(18), dp(10))
         }
         k3.addView(pin, LinearLayout.LayoutParams(dp(320), ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
@@ -1924,7 +1924,7 @@ class MainActivity : Activity() {
         val pill = vodorovne().apply {
             isFocusable = true
             isClickable = true
-            background = vyber(Color.parseColor("#2A2B36"), radius = 999f)
+            background = vyber(Color.parseColor("#1B2744"), radius = 999f)
             setPadding(dp(3), dp(3), dp(3), dp(3))
             addView(anoTxt, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             addView(neTxt, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -1944,7 +1944,7 @@ class MainActivity : Activity() {
 
     private fun nastavObsah(obsah: View, sirka: Int = ViewGroup.LayoutParams.WRAP_CONTENT) {
         val ram = FrameLayout(this).apply {
-            setBackgroundColor(CERNA)
+            background = Tema.pozadie()
             clipToPadding = false // značka BETA sedí v okraji
             if (telefon) setPadding(dp(20), dp(28), dp(20), dp(28)) else setPadding(dp(56), dp(36), dp(56), dp(36))
             addView(obsah, FrameLayout.LayoutParams(sirka, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL))
@@ -1953,7 +1953,7 @@ class MainActivity : Activity() {
             })
         }
         setContentView(ScrollView(this).apply {
-            setBackgroundColor(CERNA)
+            background = Tema.pozadie()
             isFillViewport = true
             addView(ram)
         })

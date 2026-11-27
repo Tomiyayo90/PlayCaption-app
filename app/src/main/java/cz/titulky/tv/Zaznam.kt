@@ -76,7 +76,7 @@ object Zaznam {
         val telefon = Rezim.jeTelefon(a)
         val dlg = Dialog(a, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         val zluta = Color.parseColor("#FFC24B")
-        val seda = Color.parseColor("#A8A8B3")
+        val seda = Color.parseColor("#8FA3C7")
         fun kulate(barva: Int, ramecek: Int? = null) = GradientDrawable().apply {
             setColor(barva); cornerRadius = 16f * d
             if (ramecek != null) setStroke(px(3), ramecek)
@@ -134,7 +134,7 @@ object Zaznam {
             gravity = Gravity.CENTER
             isFocusable = true
             isClickable = true
-            background = vyber(Color.parseColor("#2A2B36"))
+            background = vyber(Color.parseColor("#1B2744"))
             setPadding(px(20), px(10), px(20), px(10))
             setOnClickListener { akce() }
         }

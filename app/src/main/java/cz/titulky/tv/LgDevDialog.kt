@@ -118,7 +118,7 @@ internal class LgDevModeView(private val activity: Activity, private val profil:
                 if (isShown && hasWindowFocus()) LgDevMode.obnov(activity, p.id)
                 text = lgDevPopis(activity, p.id) + "  ›"
                 val cas = LgDevUloziste(activity).cas(p.id)
-                setTextColor(Color.parseColor(if (cas?.brzy(System.currentTimeMillis()) == true && !LgDevMode.chyba(p.id)) "#FFC978" else "#B2B3BF"))
+                setTextColor(Color.parseColor(if (cas?.brzy(System.currentTimeMillis()) == true && !LgDevMode.chyba(p.id)) "#FFC978" else "#8FA3C7"))
                 setOnClickListener { LgDevDialog(activity, p).ukaz() }
             }
             postDelayed(this, 1000)
