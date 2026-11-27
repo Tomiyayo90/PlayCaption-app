@@ -38,6 +38,22 @@ exports.parse = function (buffer) {
         var ocrArea = area(fields.slice(2, 6));
         return ocrArea ? { kind: "ocr", visible: fields[1] === "1", area: ocrArea } : null;
     }
+    if (fields[0] === "PCB1") {
+        // Překlad textů na obrazovce přímo na jejich místě: PCB1, id, doba v ms, bloky...
+        // Blok: vlevo;nahoře;vpravo;dole;pozadí ARGB;písmo ARGB;text
+        if (fields.length < 3 || !/^\d{1,19}$/.test(fields[1]) || !/^\d{1,6}$/.test(fields[2])) return null;
+        if (fields.length > 51) return null;
+        var blocks = [];
+        for (var b = 3; b < fields.length; b++) {
+            var m = /^([0-9.]+);([0-9.]+);([0-9.]+);([0-9.]+);(\d{1,10});(\d{1,10});([\s\S]*)$/.exec(fields[b]);
+            if (!m) return null;
+            var box = area([m[1], m[2], m[3], m[4]]);
+            var bg = Number(m[5]), fg = Number(m[6]);
+            if (!box || bg > 4294967295 || fg > 4294967295 || m[7].length > 400) return null;
+            blocks.push({ area: box, bg: bg, fg: fg, text: unescape(m[7]) });
+        }
+        return { kind: "blocks", id: fields[1], duration: Math.min(120000, Number(fields[2])), blocks: blocks };
+    }
     if (fields[0] === "PCV1") {
         if (fields.length < 9 || !/^\d{1,19}$/.test(fields[1]) || !/^[012]$/.test(fields[2]) ||
             !/^(?:-2|-1|\d{1,2})$/.test(fields[7]) || fields[8].length > 4096) return null;
