@@ -527,6 +527,47 @@ class TelefonActivity : Activity() {
             posuvnik(t("tvPismo"), 50, 250, { (rozvrh[3] * 100).toInt() }, { rozvrh[3] = it / 100f })
         }
 
+        // ---- Gemini: dabing zap/vyp, predvoľba GTA 6, nastavenia
+        Gemini.init(this)
+        fun gTlacidlo(popis: String, aktivne: Boolean, akcia: () -> Unit) = TextView(this).apply {
+            this.text = popis
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(if (aktivne) Color.BLACK else OblastTitulku.MODRA)
+            background = GradientDrawable().apply {
+                cornerRadius = 999f
+                if (aktivne) setColor(OblastTitulku.MODRA) else { setColor(Color.TRANSPARENT); setStroke(dp(2), OblastTitulku.MODRA) }
+            }
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            setOnClickListener { akcia() }
+        }
+        val dabingZapnuty = Dabing.rezim != Dabing.VYPNUTE
+        obal.addView(
+            gTlacidlo(if (dabingZapnuty) "Dabing: zapnutý (titulky + hlas)" else "Dabing: vypnutý (len titulky)", dabingZapnuty) {
+                Dabing.prepni()
+                obnovUpravy()
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(14) }
+        )
+        obal.addView(
+            gTlacidlo("GTA 6: nastaviť oblasť titulkov", false) {
+                OblastTitulku.rucne = true
+                OblastTitulku.oblast = floatArrayOf(0.21f, 0.80f, 0.78f, 0.935f)
+                OblastTitulku.uloz(this@TelefonActivity)
+                ulozAPosliOblastTitulku()
+                ui.removeCallbacks(konecUprav); ui.postDelayed(konecUprav, 3000)
+                obnovUpravy()
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+        )
+        obal.addView(
+            gTlacidlo("Gemini nastavenia (kľúč, hlas, kontext)", false) {
+                startActivity(android.content.Intent(this@TelefonActivity, GeminiNastaveniActivity::class.java))
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+        )
+
         // ---- čtení titulků: automaticky / ručně (modrý rámeček) + zámeček vedle
         val radekModry = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         radekModry.addView(TextView(this).apply {

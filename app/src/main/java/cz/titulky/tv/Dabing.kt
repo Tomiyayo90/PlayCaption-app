@@ -71,6 +71,18 @@ object Dabing {
         get() = prefs?.getString("elevenMuz", "") ?: ""
         set(v) { prefs?.edit()?.putString("elevenMuz", v.trim())?.apply() }
 
+    /** Rýchle zapnutie/vypnutie (tlačidlo v aplikácii). Pri zapnutí sa vráti posledný zvolený hlas. */
+    fun prepni() {
+        val p = prefs ?: return
+        if (rezim != VYPNUTE) {
+            p.edit().putInt("posledny", rezim).apply()
+            rezim = VYPNUTE
+        } else {
+            val posledny = p.getInt("posledny", GEMINI)
+            rezim = if (posledny == VYPNUTE) GEMINI else posledny
+        }
+    }
+
     /** Zavolá sa s hotovým prekladom (riadky "MENO: veta"). */
     fun povedz(preklad: String) {
         if (prefs == null || rezim == VYPNUTE) return

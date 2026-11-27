@@ -67,7 +67,10 @@ class Prekladac(context: android.content.Context? = null, cilovy: String = "cs")
             if (!pribehObsazen.compareAndSet(false, true)) false
             else try {
                 pribehSit.execute {
-                    val vysledek = try { runCatching { google(t, jazyk) }.getOrNull() }
+                    val vysledek = try {
+                        runCatching { Gemini.preloz(t, jazyk) }.getOrNull()?.takeIf { it.isNotBlank() }
+                            ?: runCatching { google(t, jazyk) }.getOrNull()
+                    }
                     finally { pribehObsazen.set(false) }
                     ui.post {
                         if (!vysledek.isNullOrBlank() && cil == jazyk && !zavreno) cache.put(t, vysledek)
