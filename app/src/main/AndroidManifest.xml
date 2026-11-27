@@ -56,6 +56,11 @@
             android:exported="false"/>
 
         <activity
+            android:name=".StmavenieActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
+
+        <activity
             android:name=".LgExportActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
