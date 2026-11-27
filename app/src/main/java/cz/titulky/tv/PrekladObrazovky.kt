@@ -204,8 +204,8 @@ object PrekladObrazovky {
     }
 
     /**
-     * Okno vedľa pôvodného textu: úzke bubliny. Správy, ktoré dostávam, majú svetlosivý podklad
-     * a biele písmo, moje svetlomodrý podklad a biele písmo, všetky s čiernym orámovaním.
+     * Okno vedľa pôvodného textu ako v GlossaSub: svetlý panel s čiernym orámovaním a v ňom bubliny.
+     * Správy, ktoré dostávam, sú vľavo (svetlosivé, biele písmo), moje vpravo (svetlomodré, biele písmo).
      */
     private fun rozlozOkno(pary: List<Pair<Kus, String>>): List<Propojeni.Vysilac.Blok> {
         val kusy = pary.map { it.first }
@@ -213,25 +213,36 @@ object PrekladObrazovky {
         val sirka = SIRKA_OKNA
         val x = if (ul >= 1f - ur) maxOf(0.02f, ul - sirka - 0.012f)
                 else minOf(1f - sirka - 0.02f, ur + 0.012f)
-        val vrch = ut.coerceIn(0.06f, 0.30f)
-        val znakovNaRiadok = (sirka * 1920f * 0.88f / (PISMO_PX * 0.52f)).toInt().coerceAtLeast(12)
+        val vrch = ut.coerceIn(0.08f, 0.30f)
+        val okraj = 0.008f
+        val vnutro = sirka - 2 * okraj
+        val bubSirka = vnutro * 0.9f
+        val znakovNaRiadok = (bubSirka * 1920f * 0.9f / (PISMO_PX * 0.52f)).toInt().coerceAtLeast(12)
         val vysky = pary.map { (_, t) ->
             val riadkov = Math.ceil(t.length.toDouble() / znakovNaRiadok).toInt().coerceAtLeast(1)
             (riadkov * PISMO_PX * 1.15f + 12f) / 1080f
         }
         val medzera = 0.008f
+        val pata = 0.03f
         var spolu = vysky.sum() + medzera * (vysky.size - 1)
-        val maxVyska = 0.88f - vrch
+        val maxVyska = 0.84f - vrch - pata - okraj
         val mierka = if (spolu > maxVyska) maxVyska / spolu else 1f
+        spolu *= mierka
+        val spodok = vrch + okraj + spolu + okraj + pata
         val cierna = 0xFF000000.toInt(); val biela = 0xFFFFFFFF.toInt()
         val vysl = ArrayList<Propojeni.Vysilac.Blok>()
-        var y = vrch
+        // panel pod bublinami
+        vysl.add(Propojeni.Vysilac.Blok(x, vrch, x + sirka, spodok, 0xF2DCE8F6.toInt(), cierna, "", cierna))
+        var y = vrch + okraj
         for ((i, par) in pary.withIndex()) {
             val v = vysky[i] * mierka
-            val pozadie = if (par.first.moje) 0xFF6FB1F2.toInt() else 0xFF9AA3AF.toInt()
-            vysl.add(Propojeni.Vysilac.Blok(x, y, x + sirka, y + v, pozadie, biela, par.second, cierna))
+            val moje = par.first.moje
+            val l = if (moje) x + okraj + (vnutro - bubSirka) else x + okraj
+            val pozadie = if (moje) 0xFF5B9FE8.toInt() else 0xFF8E97A4.toInt()
+            vysl.add(Propojeni.Vysilac.Blok(l, y, l + bubSirka, y + v, pozadie, biela, par.second))
             y += v + medzera * mierka
         }
+        vysl.add(Propojeni.Vysilac.Blok(x, spodok - pata, x + sirka, spodok - 0.004f, 0x00000000, 0xFF7A8499.toInt(), "SlovakCaption · Slovenčina"))
         return vysl
     }
 
