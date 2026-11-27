@@ -92,4 +92,25 @@ object Tema {
         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(farba) }
         layoutParams = LinearLayout.LayoutParams(dp(c, 10), dp(c, 10)).apply { rightMargin = dp(c, 8) }
     }
+
+    /** Adaptér pre Spinner so svetlým textom (aby bol čitateľný na tmavom pozadí). */
+    fun adapter(c: Context, polozky: List<String>): android.widget.ArrayAdapter<String> =
+        object : android.widget.ArrayAdapter<String>(c, android.R.layout.simple_spinner_dropdown_item, polozky) {
+            private fun uprav(v: android.view.View, pozadie: Int): android.view.View {
+                (v as? android.widget.TextView)?.apply {
+                    setTextColor(Color.WHITE); textSize = 16f
+                    setBackgroundColor(pozadie)
+                    setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12))
+                }
+                return v
+            }
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup) =
+                uprav(super.getView(position, convertView, parent), Color.TRANSPARENT)
+            override fun getDropDownView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup) =
+                uprav(super.getDropDownView(position, convertView, parent), 0xFF1B2A4D.toInt())
+        }
+
+    fun spinner(c: Context): android.widget.Spinner = android.widget.Spinner(c).apply {
+        setPopupBackgroundDrawable(android.graphics.drawable.ColorDrawable(0xFF1B2A4D.toInt()))
+    }
 }

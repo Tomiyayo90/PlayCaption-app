@@ -87,8 +87,8 @@ class GeminiNastaveniActivity : Activity() {
         val hra = Tema.kartaBox(c)
         hra.addView(popis("Vybraná hra (kontext prekladu, mená ktoré sa neprekladajú)"))
         val nazvy = listOf("Iná hra (všeobecne)") + Hry.vsetky.map { it.title }
-        val hraSpinner = Spinner(c).apply {
-            adapter = ArrayAdapter(c, android.R.layout.simple_spinner_dropdown_item, nazvy)
+        val hraSpinner = Tema.spinner(c).apply {
+            adapter = Tema.adapter(c, nazvy)
             val i = Hry.vsetky.indexOfFirst { it.id == Gemini.hraId }
             setSelection(if (i >= 0) i + 1 else 0)
         }
@@ -111,15 +111,15 @@ class GeminiNastaveniActivity : Activity() {
         koren.addView(Tema.nadpisSekcie(c, "Dabing"))
         val dab = Tema.kartaBox(c)
         dab.addView(popis("Zdroj hlasu (prehráva sa v telefóne alebo v slúchadlách)"))
-        val rezim = Spinner(c).apply {
-            adapter = ArrayAdapter(c, android.R.layout.simple_spinner_dropdown_item,
+        val rezim = Tema.spinner(c).apply {
+            adapter = Tema.adapter(c,
                 listOf("Vypnuté (len titulky)", "Gemini hlas", "ElevenLabs hlas"))
             setSelection(Dabing.rezim.coerceIn(0, 2))
         }
         dab.addView(rezim)
         dab.addView(popis("Výber hlasu"))
-        val hlasVolba = Spinner(c).apply {
-            adapter = ArrayAdapter(c, android.R.layout.simple_spinner_dropdown_item,
+        val hlasVolba = Tema.spinner(c).apply {
+            adapter = Tema.adapter(c,
                 listOf("Podľa postavy (každá má svoj hlas)", "Vždy ženský", "Vždy mužský"))
             setSelection(Dabing.hlasVolba.coerceIn(0, 2))
         }
