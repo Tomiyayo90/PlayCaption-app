@@ -36,20 +36,24 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
         <activity
-            android:name=".GeminiNastaveniActivity"
-            android:label="Gemini nastavenia"
-            android:theme="@android:style/Theme.DeviceDefault"
+            android:name=".DomovActivity"
+            android:label="@string/app_name"
+            android:icon="@drawable/gamelingo_ikona"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".GeminiNastaveniActivity"
+            android:label="Nastavenia"
+            android:exported="false"/>
 
         <activity
             android:name=".LgExportActivity"
