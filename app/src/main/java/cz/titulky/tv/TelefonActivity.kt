@@ -562,7 +562,17 @@ class TelefonActivity : Activity() {
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
         )
         obal.addView(
-            gTlacidlo("Preložiť obrazovku (menu, ciele, mobil v hre)", false) {
+            gTlacidlo("Automatický preklad obrazovky: zapnúť / vypnúť", false) {
+                PrekladObrazovky.init(this@TelefonActivity)
+                PrekladObrazovky.automat = !PrekladObrazovky.automat
+                android.widget.Toast.makeText(this@TelefonActivity,
+                    if (PrekladObrazovky.automat) "Automatický preklad obrazovky je zapnutý" else "Automatický preklad obrazovky je vypnutý",
+                    android.widget.Toast.LENGTH_SHORT).show()
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+        )
+        obal.addView(
+            gTlacidlo("Preložiť obrazovku hneď", false) {
                 PrekladObrazovky.spusti(this@TelefonActivity)
             },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }

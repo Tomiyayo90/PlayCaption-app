@@ -74,7 +74,12 @@ class DomovActivity : Activity() {
         }
         koren.addView(hra, Tema.lp(c, 12))
 
-        koren.addView(Tema.tlacidlo(c, "Preložiť obrazovku (menu, ciele, mobil v hre)", false) {
+        PrekladObrazovky.init(c)
+        val aut = Tema.kartaBox(c)
+        aut.addView(Tema.prepinac(c, "Automaticky prekladať text na obrazovke", PrekladObrazovky.automat) { PrekladObrazovky.automat = it })
+        aut.addView(Tema.text(c, "Menu, ciele misií, mobil v hre. Preloží sa samo, keď sa obraz zastaví. Každý preklad je jedno volanie Gemini.", 13f, Tema.SLABY).apply { setPadding(0, Tema.dp(c, 4), 0, 0) })
+        koren.addView(aut, Tema.lp(c, 12))
+        koren.addView(Tema.tlacidlo(c, "Preložiť obrazovku hneď (menu, ciele, mobil v hre)", false) {
             PrekladObrazovky.spusti(c)
         }, Tema.lp(c, 12))
         koren.addView(Tema.tlacidlo(c, "Stmaviť obrazovku (šetrí batériu)", false) {
