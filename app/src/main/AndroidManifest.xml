@@ -21,16 +21,16 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/gamelingo_ikona"
-        android:roundIcon="@drawable/gamelingo_ikona"
-        android:banner="@drawable/gamelingo_banner"
+        android:icon="@drawable/ikona_slovak"
+        android:roundIcon="@drawable/ikona_slovak"
+        android:banner="@drawable/ikona_slovak_banner"
         android:label="@string/app_name"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
             android:name=".MainActivity"
             android:label="@string/app_name"
-            android:icon="@drawable/gamelingo_ikona"
+            android:icon="@drawable/ikona_slovak"
             android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
@@ -42,7 +42,7 @@
         <activity
             android:name=".DomovActivity"
             android:label="@string/app_name"
-            android:icon="@drawable/gamelingo_ikona"
+            android:icon="@drawable/ikona_slovak"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
