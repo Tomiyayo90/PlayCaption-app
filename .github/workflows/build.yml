@@ -24,9 +24,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - uses: android-actions/setup-android@v3
-
+          
       - name: Build debug APK
         run: bash gradlew :app:assembleDebug --no-daemon
 
