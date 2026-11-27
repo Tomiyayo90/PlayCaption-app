@@ -562,7 +562,13 @@ class TelefonActivity : Activity() {
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
         )
         obal.addView(
-            gTlacidlo("Gemini nastavenia (kľúč, hlas, kontext)", false) {
+            gTlacidlo("Stmaviť obrazovku (šetrí batériu)", false) {
+                startActivity(android.content.Intent(this@TelefonActivity, StmavenieActivity::class.java))
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+        )
+        obal.addView(
+            gTlacidlo("Nastavenia prekladu a dabingu", false) {
                 startActivity(android.content.Intent(this@TelefonActivity, GeminiNastaveniActivity::class.java))
             },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }

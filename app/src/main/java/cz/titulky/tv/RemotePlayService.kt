@@ -296,6 +296,7 @@ class RemotePlayService : Service() {
     @android.annotation.SuppressLint("WakelockTimeout")
     private fun drzWifi(ano: Boolean) {
         napajeniZapnuto = ano
+        Upozornenie.stav(this, ano)
         runCatching {
             val lg = TelefonPozadi.pokracovatNaLg(ano && aktivni, Propojeni.Vysilac.cilIp,
                 TvProfily.aktivniId?.let { TvProfily(this).najdi(it)?.platforma })
@@ -1225,6 +1226,7 @@ class RemotePlayService : Service() {
     private var posledniSpojeno = false
 
     private fun prelozAUkaz(surove: List<String>, box: FloatArray?, radku: Int, barvyJmen: IntArray, cislo: Long, oprava: Boolean = false) {
+        Upozornenie.titulokViden()
         if (!nast.dialogy) return
         if (chcePribeh()) {
             val relace = relaceCteni.get()

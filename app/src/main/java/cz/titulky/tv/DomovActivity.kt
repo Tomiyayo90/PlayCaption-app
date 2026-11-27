@@ -1,15 +1,16 @@
 package cz.titulky.tv
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Toast
 
-/** Domovská obrazovka na telefóne (modro-čierny vzhľad). Hlavné nastavenie konzoly zostáva v MainActivity. */
+/** Domovská obrazovka na telefóne (modro-čierny vzhľad). Pripojenie konzoly zostáva v MainActivity. */
 class DomovActivity : Activity() {
     private lateinit var koren: LinearLayout
 
@@ -42,7 +43,6 @@ class DomovActivity : Activity() {
         koren.addView(Tema.text(c, "SlovakCaption", 30f, Color.WHITE, true))
         koren.addView(Tema.text(c, "PS5 · " + jazykNazov(jazyk) + " · Gemini", 14f, Tema.SLABY))
 
-        // hlavná karta
         val start = Tema.kartaBox(c, Tema.AKCENT).apply { setPadding(Tema.dp(c, 20), Tema.dp(c, 20), Tema.dp(c, 20), Tema.dp(c, 20)) }
         start.addView(Tema.text(c, if (kluc) "Pripravené" else "Chýba Gemini kľúč", 13f, if (kluc) Tema.OK else Tema.CHYBA, true))
         start.addView(Tema.text(c, "Spustiť preklad", 24f, Color.WHITE, true))
@@ -50,7 +50,6 @@ class DomovActivity : Activity() {
         start.addView(Tema.tlacidlo(c, "▶  Pripojenie a spustenie", true) { startActivity(Intent(c, MainActivity::class.java)) })
         koren.addView(start, Tema.lp(c, 20))
 
-        // rýchle akcie
         koren.addView(Tema.nadpisSekcie(c, "Rýchle akcie"))
         val dab = Tema.kartaBox(c)
         dab.addView(Tema.prepinac(c, "Dabing (hlas v slúchadlách)", dabingZap) { zap ->
@@ -62,18 +61,23 @@ class DomovActivity : Activity() {
 
         val hra = Tema.kartaBox(c)
         hra.addView(Tema.text(c, "Hra", 13f, Tema.SLABY))
-        hra.addView(Tema.text(c, "Grand Theft Auto VI", 17f, Color.WHITE, true))
-        hra.addView(Tema.text(c, "Nastaví oblasť titulkov podľa GlossaSub a kontext prekladu.", 13f, Tema.SLABY).apply { setPadding(0, Tema.dp(c, 2), 0, Tema.dp(c, 12)) })
-        hra.addView(Tema.tlacidlo(c, "Použiť predvoľbu GTA 6", false) {
-            OblastTitulku.rucne = true
-            OblastTitulku.oblast = floatArrayOf(0.21f, 0.80f, 0.78f, 0.935f)
-            OblastTitulku.uloz(c)
-            Gemini.kontext = Gemini.VYCHODZI_KONTEXT
-            android.widget.Toast.makeText(c, "Predvoľba GTA 6 nastavená", android.widget.Toast.LENGTH_SHORT).show()
-        })
+        hra.addView(Tema.text(c, Gemini.nazovHry(), 17f, Color.WHITE, true))
+        hra.addView(Tema.text(c, "Kontext prekladu a mená postáv sa berú podľa hry.", 13f, Tema.SLABY).apply { setPadding(0, Tema.dp(c, 2), 0, Tema.dp(c, 12)) })
+        hra.addView(Tema.tlacidlo(c, "Vybrať hru", false) { vyberHru() })
+        if (Gemini.hraId == "gta6") {
+            hra.addView(Tema.tlacidlo(c, "Nastaviť oblasť titulkov pre GTA 6", false) {
+                OblastTitulku.rucne = true
+                OblastTitulku.oblast = floatArrayOf(0.21f, 0.80f, 0.78f, 0.935f)
+                OblastTitulku.uloz(c)
+                Toast.makeText(c, "Oblasť titulkov pre GTA 6 nastavená", Toast.LENGTH_SHORT).show()
+            }, Tema.lp(c, 10))
+        }
         koren.addView(hra, Tema.lp(c, 12))
 
-        // stav
+        koren.addView(Tema.tlacidlo(c, "Stmaviť obrazovku (šetrí batériu)", false) {
+            startActivity(Intent(c, StmavenieActivity::class.java))
+        }, Tema.lp(c, 12))
+
         koren.addView(Tema.nadpisSekcie(c, "Stav"))
         val stav = Tema.kartaBox(c)
         fun riadok(t: String, ok: Boolean) {
@@ -90,6 +94,19 @@ class DomovActivity : Activity() {
         koren.addView(Tema.tlacidlo(c, "⚙  Nastavenia prekladu a dabingu", false) {
             startActivity(Intent(c, GeminiNastaveniActivity::class.java))
         }, Tema.lp(c, 20))
+    }
+
+    private fun vyberHru() {
+        val nazvy = (listOf("Iná hra (všeobecne)") + Hry.vsetky.map { it.title }).toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Vybrať hru")
+            .setItems(nazvy) { _, i ->
+                val nova = if (i == 0) "" else Hry.vsetky[i - 1].id
+                if (nova != Gemini.hraId) Dabing.zabudniHlasy()
+                Gemini.hraId = nova
+                vykresli()
+            }
+            .show()
     }
 
     private fun jazykNazov(k: String) = when (k) {

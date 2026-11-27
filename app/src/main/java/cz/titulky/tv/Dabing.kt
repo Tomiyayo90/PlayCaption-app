@@ -20,11 +20,15 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Dabing prekladu: hlas sa prehráva v telefóne (slúchadlá / reproduktor).
  * Režimy: 0 = vypnuté, 1 = Gemini TTS (používa Gemini kľúč), 2 = ElevenLabs.
+ * Hlas podľa postavy: každé meno dostane svoj stály hlas (uložený v telefóne).
  */
 object Dabing {
     const val VYPNUTE = 0
     const val GEMINI = 1
     const val ELEVEN = 2
+    const val HLAS_POSTAVA = 0
+    const val HLAS_ZENA = 1
+    const val HLAS_MUZ = 2
     const val VYCHODZI_TTS_MODEL = "gemini-3.8-flash-lite-tts"
     private const val ELEVEN_MODEL = "eleven_flash_v2_5"
 
@@ -34,14 +38,16 @@ object Dabing {
     private val fronta = AtomicInteger(0)
     @Volatile private var poslednyText = ""
     @Volatile private var poslednyCas = 0L
+    @Volatile private var generacia = 0
+    @Volatile private var zastav: (() -> Unit)? = null
     @Volatile var poslednaChyba = ""
         private set
 
     private val MENO = Regex("^([A-Z][A-Za-z0-9 .'-]{1,24}):\\s*(.+)$")
-    private val ZENY = setOf("lucia", "maya", "mia", "nadia")
-    private val MUZI = setOf("jason", "leo", "jay", "tomas", "boobie", "dre'quan")
-    private val GEMINI_ZENY = listOf("Kore", "Leda", "Aoede", "Zephyr")
-    private val GEMINI_MUZI = listOf("Charon", "Puck", "Orus", "Fenrir")
+    private val ZENY = setOf("lucia", "maya", "mia", "nadia", "vivian")
+    private val MUZI = setOf("jason", "leo", "jay", "tomas", "boobie", "dre'quan", "cal", "raul", "brian")
+    private val GEMINI_ZENY = listOf("Kore", "Leda", "Aoede", "Zephyr", "Callirrhoe")
+    private val GEMINI_MUZI = listOf("Charon", "Puck", "Orus", "Fenrir", "Enceladus")
 
     @Synchronized
     fun init(c: Context) {
@@ -54,6 +60,21 @@ object Dabing {
     var rezim: Int
         get() = prefs?.getInt("rezim", VYPNUTE) ?: VYPNUTE
         set(v) { prefs?.edit()?.putInt("rezim", v)?.apply() }
+
+    /** Podľa postavy / vždy ženský / vždy mužský hlas. */
+    var hlasVolba: Int
+        get() = prefs?.getInt("hlasVolba", HLAS_POSTAVA) ?: HLAS_POSTAVA
+        set(v) { prefs?.edit()?.putInt("hlasVolba", v)?.apply() }
+
+    /** Hlasitosť dabingu 0–100 %. */
+    var hlasitost: Int
+        get() = (prefs?.getInt("hlasitost", 100) ?: 100).coerceIn(0, 100)
+        set(v) { prefs?.edit()?.putInt("hlasitost", v.coerceIn(0, 100))?.apply() }
+
+    /** Nový riadok preruší hlas predchádzajúceho. */
+    var prerusit: Boolean
+        get() = prefs?.getBoolean("prerusit", true) ?: true
+        set(v) { prefs?.edit()?.putBoolean("prerusit", v)?.apply() }
 
     var ttsModel: String
         get() = (prefs?.getString("ttsModel", null) ?: VYCHODZI_TTS_MODEL).ifBlank { VYCHODZI_TTS_MODEL }
@@ -71,12 +92,22 @@ object Dabing {
         get() = prefs?.getString("elevenMuz", "") ?: ""
         set(v) { prefs?.edit()?.putString("elevenMuz", v.trim())?.apply() }
 
-    /** Rýchle zapnutie/vypnutie (tlačidlo v aplikácii). Pri zapnutí sa vráti posledný zvolený hlas. */
+    /** Zabudne priradené hlasy postáv (po zmene hry). */
+    fun zabudniHlasy() {
+        val p = prefs ?: return
+        val e = p.edit()
+        for (k in p.all.keys) if (k.startsWith("hlas_") || k.startsWith("cnt_")) e.remove(k)
+        e.apply()
+    }
+
+    /** Rýchle zapnutie/vypnutie. Pri zapnutí sa vráti posledný zvolený hlas. */
     fun prepni() {
         val p = prefs ?: return
         if (rezim != VYPNUTE) {
             p.edit().putInt("posledny", rezim).apply()
             rezim = VYPNUTE
+            generacia++
+            zastav?.invoke()
         } else {
             val posledny = p.getInt("posledny", GEMINI)
             rezim = if (posledny == VYPNUTE) GEMINI else posledny
@@ -90,6 +121,8 @@ object Dabing {
         if (preklad == poslednyText && ted - poslednyCas < 6000) return
         poslednyText = preklad
         poslednyCas = ted
+        if (prerusit) { generacia++; zastav?.invoke() }
+        val gen = generacia
         for (riadok in preklad.split("\n")) {
             val t = riadok.trim()
             if (t.isEmpty()) continue
@@ -101,7 +134,7 @@ object Dabing {
             fronta.incrementAndGet()
             vlakno.execute {
                 try {
-                    prehraj(veta, meno)
+                    if (!(prerusit && gen != generacia)) prehraj(veta, meno, gen)
                     poslednaChyba = ""
                 } catch (e: Exception) {
                     poslednaChyba = e.message ?: e.javaClass.simpleName
@@ -113,30 +146,45 @@ object Dabing {
     }
 
     /** Test z nastavení – vyhodí výnimku s popisom chyby. */
-    fun test() = prehraj("Ahoj, toto je skúška dabingu.", null)
+    fun test() { generacia++; prehraj("Ahoj, toto je skúška dabingu.", null, generacia) }
 
-    private fun jeZena(meno: String?): Boolean {
-        if (meno == null) return false
+    private fun jeZena(meno: String): Boolean {
         val m = meno.lowercase()
         return when {
             m in ZENY -> true
             m in MUZI -> false
-            else -> Math.abs(m.hashCode()) % 2 == 1
+            else -> m.endsWith("a")
         }
     }
 
-    private fun prehraj(text: String, meno: String?) {
-        val zena = jeZena(meno)
-        val idx = if (meno == null) 0 else Math.abs(meno.lowercase().hashCode()) % 4
+    /** Stály hlas postavy: prvé meno dostane prvý hlas, ďalšie ďalšie (uloží sa). */
+    private fun indexHlasu(meno: String, zena: Boolean, pocet: Int): Int {
+        val p = prefs ?: return 0
+        val kluc = "hlas_" + (if (zena) "z_" else "m_") + meno.lowercase()
+        if (p.contains(kluc)) return p.getInt(kluc, 0) % pocet
+        val cnt = "cnt_" + (if (zena) "z" else "m")
+        val dalsi = p.getInt(cnt, 0)
+        p.edit().putInt(kluc, dalsi).putInt(cnt, dalsi + 1).apply()
+        return dalsi % pocet
+    }
+
+    private fun prehraj(text: String, meno: String?, gen: Int) {
+        val zena = when (hlasVolba) {
+            HLAS_ZENA -> true
+            HLAS_MUZ -> false
+            else -> if (meno == null) false else jeZena(meno)
+        }
         when (rezim) {
             GEMINI -> {
-                val hlas = (if (zena) GEMINI_ZENY else GEMINI_MUZI)[idx]
-                prehrajPcm(geminiTts(text, hlas))
+                val zoznam = if (zena) GEMINI_ZENY else GEMINI_MUZI
+                // rozprávač (riadky bez mena) a pevná voľba = prvý hlas; postavy dostávajú ďalšie
+                val idx = if (meno == null || hlasVolba != HLAS_POSTAVA) 0 else indexHlasu(meno, zena, zoznam.size)
+                prehrajPcm(geminiTts(text, zoznam[idx]), gen)
             }
             ELEVEN -> {
                 val hlas = if (zena) elevenHlasZena else elevenHlasMuz
                 if (hlas.isBlank()) throw IllegalStateException("Zadaj ID hlasu pre ElevenLabs")
-                prehrajMp3(elevenTts(text, hlas))
+                prehrajMp3(elevenTts(text, hlas), gen)
             }
         }
     }
@@ -192,9 +240,11 @@ object Dabing {
         )
     }
 
+    private fun preruseny(gen: Int) = prerusit && gen != generacia
+
     /** Gemini TTS vracia surový zvuk PCM 16-bit, mono, 24 kHz. */
-    private fun prehrajPcm(pcm: ByteArray) {
-        if (pcm.isEmpty()) return
+    private fun prehrajPcm(pcm: ByteArray, gen: Int) {
+        if (pcm.isEmpty() || preruseny(gen)) return
         val track = AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -207,17 +257,22 @@ object Dabing {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
         try {
+            track.setVolume(hlasitost / 100f)
             track.write(pcm, 0, pcm.size)
+            zastav = { runCatching { track.stop() } }
             track.play()
-            Thread.sleep(pcm.size / 2 * 1000L / 24000 + 150)
+            val koniec = System.currentTimeMillis() + pcm.size / 2 * 1000L / 24000 + 150
+            while (System.currentTimeMillis() < koniec && !preruseny(gen) && rezim != VYPNUTE) Thread.sleep(40)
         } finally {
+            zastav = null
             runCatching { track.stop() }
             track.release()
         }
     }
 
-    private fun prehrajMp3(data: ByteArray) {
+    private fun prehrajMp3(data: ByteArray, gen: Int) {
         val d = dir ?: return
+        if (preruseny(gen)) return
         val f = File(d, "dabing.mp3")
         f.writeBytes(data)
         val latch = CountDownLatch(1)
@@ -227,9 +282,15 @@ object Dabing {
             mp.setOnCompletionListener { latch.countDown() }
             mp.setOnErrorListener { _, _, _ -> latch.countDown(); true }
             mp.prepare()
+            val v = hlasitost / 100f
+            mp.setVolume(v, v)
+            zastav = { latch.countDown() }
             mp.start()
-            latch.await(30, TimeUnit.SECONDS)
+            var cakam = 0
+            while (!latch.await(100, TimeUnit.MILLISECONDS) && cakam < 300 && !preruseny(gen) && rezim != VYPNUTE) cakam++
         } finally {
+            zastav = null
+            runCatching { mp.stop() }
             runCatching { mp.release() }
         }
     }

@@ -15,11 +15,6 @@ import java.net.URL
 object Gemini {
     const val VYCHODZI_MODEL = "gemini-3.5-flash-lite"
 
-    const val VYCHODZI_KONTEXT = """Game: Grand Theft Auto VI (Rockstar Games). Crime story set in the state of Leonida (a satire of Florida) and Vice City. Main characters: Jason and Lucia, a criminal couple.
-Dialogue is street talk full of slang, jokes and profanity: translate into natural, informal spoken language, keep swearing at the same strength and keep jokes funny rather than literal.
-Never translate names of people, places, brands or in-game apps (e.g. Leonida, Vice City, Port Gellhorn, Grassrivers, Ambrosia, Lucia, Jason, Bleeter, LifeInvader, Fleeca, Badger).
-UI hints, button prompts and mission objectives should be short and imperative."""
-
     private var prefs: SharedPreferences? = null
     private var subor: File? = null
     private val pamet = object : LinkedHashMap<String, String>(512, 0.75f, true) {
@@ -63,9 +58,34 @@ UI hints, button prompts and mission objectives should be short and imperative."
         get() = (prefs?.getString("model", null) ?: VYCHODZI_MODEL).ifBlank { VYCHODZI_MODEL }
         set(v) { prefs?.edit()?.putString("model", v.trim())?.apply() }
 
-    var kontext: String
-        get() = (prefs?.getString("kontext", null) ?: VYCHODZI_KONTEXT).ifBlank { VYCHODZI_KONTEXT }
-        set(v) { prefs?.edit()?.putString("kontext", v.trim())?.apply() }
+    /** Id vybranej hry z Hry.vsetky; prázdne = iná hra (všeobecný kontext). */
+    var hraId: String
+        get() = prefs?.getString("hra", "gta6") ?: "gta6"
+        set(v) { prefs?.edit()?.putString("hra", v)?.apply() }
+
+    /** Vlastné poznámky, ktoré sa pridajú ku kontextu hry. */
+    var poznamky: String
+        get() = prefs?.getString("poznamky", "") ?: ""
+        set(v) { prefs?.edit()?.putString("poznamky", v.trim())?.apply() }
+
+    fun nazovHry(): String = Hry.najdi(hraId)?.title ?: "Iná hra (všeobecne)"
+
+    /** Kontext pre model: popis hry, mená ktoré sa neprekladajú a vlastné poznámky. */
+    fun kontext(jazyk: String): String {
+        val l = nazovJazyka(jazyk)
+        val hra = Hry.najdi(hraId)
+        val sb = StringBuilder()
+        if (hra != null) {
+            sb.append("Game: ").append(hra.title).append(".\n").append(hra.notes.replace("{L}", l))
+            if (hra.keep.isNotEmpty()) sb.append("\nNever translate these names: ").append(hra.keep.joinToString(", ")).append(".")
+        } else {
+            sb.append("Game: an unknown video game. Translate naturally and keep names of characters, places and brands unchanged.")
+        }
+        sb.append("\nUI hints, button prompts and mission objectives should be short and imperative.")
+        val extra = poznamky
+        if (extra.isNotBlank()) sb.append("\nExtra notes: ").append(extra)
+        return sb.toString()
+    }
 
     fun pripravene(): Boolean = prefs != null && zapnute && klic.isNotBlank()
 
@@ -79,7 +99,7 @@ UI hints, button prompts and mission objectives should be short and imperative."
     /** Vráti preklad, alebo null (vypnuté / chyba) – vtedy sa použije záložný prekladač. */
     fun preloz(text: String, jazyk: String): String? {
         if (!pripravene()) return null
-        val kluc = jazyk + "|" + kontext.hashCode() + "|" + text
+        val kluc = jazyk + "|" + kontext(jazyk).hashCode() + "|" + text
         val zPamete = synchronized(pamet) { pamet[kluc] }
         if (zPamete != null) { zapamataj(text); return zPamete }
         if (System.currentTimeMillis() < pauzaDo) return null
@@ -118,7 +138,7 @@ UI hints, button prompts and mission objectives should be short and imperative."
         }
     }
 
-    private fun nazovJazyka(kod: String): String = when (kod) {
+    fun nazovJazyka(kod: String): String = when (kod) {
         "cs" -> "Czech"
         "sk" -> "Slovak"
         "de" -> "German"
@@ -135,7 +155,7 @@ UI hints, button prompts and mission objectives should be short and imperative."
             "Rules: return ONLY the translation, with no quotes, notes or explanations. " +
             "Keep it short and natural, as spoken dialogue. " +
             "The text comes from OCR and may contain small recognition errors - fix them silently.\n\n" +
-            "Game context:\n" + kontext
+            "Game context:\n" + kontext(jazyk)
         val predch = synchronized(predchadzajuce) { predchadzajuce.toList() }
         val user = if (predch.isEmpty()) text
         else "Previous lines (context only, do not translate):\n" + predch.joinToString("\n") +
