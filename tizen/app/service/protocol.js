@@ -51,12 +51,13 @@ exports.parse = function (buffer) {
         if (fields.length > 51) return null;
         var blocks = [];
         for (var b = 3; b < fields.length; b++) {
-            var m = /^([0-9.]+);([0-9.]+);([0-9.]+);([0-9.]+);(\d{1,10});(\d{1,10});([\s\S]*)$/.exec(fields[b]);
+            var m = /^([0-9.]+);([0-9.]+);([0-9.]+);([0-9.]+);(\d{1,10});(\d{1,10});(?:B(\d{1,10});)?([\s\S]*)$/.exec(fields[b]);
             if (!m) return null;
             var box = area([m[1], m[2], m[3], m[4]]);
             var bg = Number(m[5]), fg = Number(m[6]);
-            if (!box || bg > 4294967295 || fg > 4294967295 || m[7].length > 400) return null;
-            blocks.push({ area: box, bg: bg, fg: fg, text: unescape(m[7]) });
+            var border = m[7] === undefined ? 0 : Number(m[7]);
+            if (!box || bg > 4294967295 || fg > 4294967295 || border > 4294967295 || m[8].length > 400) return null;
+            blocks.push({ area: box, bg: bg, fg: fg, border: border, text: unescape(m[8]) });
         }
         return { kind: "blocks", id: fields[1], duration: Math.min(120000, Number(fields[2])), blocks: blocks };
     }
