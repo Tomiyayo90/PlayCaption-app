@@ -102,9 +102,9 @@ def main():
     verify_ipk(ipk, expected)
     manifest = {"schema": 1, "platform": "webos", "id": app["id"], "version": app["version"],
                 "file": ipk.name, "size": ipk.stat().st_size, "sha256": hashlib.sha256(ipk.read_bytes()).hexdigest(),
-                "protocols": ["PCT1", "PCV1", "PCO1", "PCQ1", "PCS1", "PCA1"], "story": True,
+                "protocols": ["PCT1", "PCV1", "PCO1", "PCB1", "PCQ1", "PCS1", "PCA1"], "story": True,
                 "capabilities": ["subtitles", "hint", "layout", "speaker-colors", "choices", "text",
-                                 "choice-frame", "ocr-frame", "controls", "local-test", "sender-lease", "story-pages", "story-ack", "story-timing", "direct-discovery"]}
+                                 "choice-frame", "ocr-frame", "blocks", "controls", "local-test", "sender-lease", "story-pages", "story-ack", "story-timing", "direct-discovery"]}
     manifest_data = (json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf8")
     (HERE / "dist/receiver-manifest.json").write_bytes(manifest_data)
     files = {ipk.name: ipk.read_bytes(), "LICENSE": (ROOT / "LICENSE").read_bytes()}
