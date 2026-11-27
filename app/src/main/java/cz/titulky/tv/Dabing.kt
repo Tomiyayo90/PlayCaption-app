@@ -55,6 +55,8 @@ object Dabing {
         val app = c.applicationContext
         prefs = app.getSharedPreferences("dabing", Context.MODE_PRIVATE)
         dir = app.cacheDir
+        Spotreba.init(app)
+        hlasyDir = File(app.filesDir, "hlasy").apply { mkdirs() }
     }
 
     var rezim: Int
@@ -81,8 +83,40 @@ object Dabing {
         set(v) { prefs?.edit()?.putString("ttsModel", v.trim())?.apply() }
 
     var elevenKlic: String
-        get() = prefs?.getString("elevenKlic", "") ?: ""
-        set(v) { prefs?.edit()?.putString("elevenKlic", v.trim())?.apply() }
+        get() = Sifra.desifruj(prefs?.getString("elevenKlic", "") ?: "")
+        set(v) { prefs?.edit()?.putString("elevenKlic", Sifra.zasifruj(v.trim()))?.apply() }
+
+    private var hlasyDir: File? = null
+
+    /** Ručné priradenie hlasov: riadky "Postava=Hlas" (napr. Jason=Charon alebo ElevenLabs ID). */
+    var rucneHlasy: String
+        get() = prefs?.getString("rucneHlasy", "") ?: ""
+        set(v) { prefs?.edit()?.putString("rucneHlasy", v)?.apply() }
+
+    private fun rucnyHlas(meno: String?): String? {
+        if (meno == null) return null
+        for (r in rucneHlasy.lines()) {
+            val i = r.indexOf('=')
+            if (i > 0 && r.substring(0, i).trim().equals(meno, true)) return r.substring(i + 1).trim().ifEmpty { null }
+        }
+        return null
+    }
+
+    fun velkostHlasov(): Long = hlasyDir?.listFiles()?.sumOf { it.length() } ?: 0L
+
+    fun vymazHlasy() { hlasyDir?.listFiles()?.forEach { it.delete() } }
+
+    /** Zvuk z disku (alebo nový z internetu a uloží sa). Rovnaká veta + hlas sa už nikdy neplatí znova. */
+    private fun zCache(typ: String, hlas: String, text: String, vyrob: () -> ByteArray): ByteArray {
+        val f = hlasyDir?.let { File(it, typ + "_" + (hlas + "|" + text).hashCode().toUInt().toString(16) + "_" + text.length) }
+        if (f != null && f.exists()) {
+            val b = runCatching { f.readBytes() }.getOrNull()
+            if (b != null && b.isNotEmpty()) { Spotreba.pridaj("hlasCache"); return b }
+        }
+        val b = vyrob()
+        if (f != null && b.isNotEmpty()) runCatching { f.writeBytes(b) }
+        return b
+    }
 
     var elevenHlasZena: String
         get() = prefs?.getString("elevenZena", "") ?: ""
@@ -179,12 +213,13 @@ object Dabing {
                 val zoznam = if (zena) GEMINI_ZENY else GEMINI_MUZI
                 // rozprávač (riadky bez mena) a pevná voľba = prvý hlas; postavy dostávajú ďalšie
                 val idx = if (meno == null || hlasVolba != HLAS_POSTAVA) 0 else indexHlasu(meno, zena, zoznam.size)
-                prehrajPcm(geminiTts(text, zoznam[idx]), gen)
+                val hlasG = rucnyHlas(meno) ?: zoznam[idx]
+                prehrajPcm(zCache("g", hlasG, text) { geminiTts(text, hlasG) }, gen)
             }
             ELEVEN -> {
-                val hlas = if (zena) elevenHlasZena else elevenHlasMuz
+                val hlas = rucnyHlas(meno) ?: if (zena) elevenHlasZena else elevenHlasMuz
                 if (hlas.isBlank()) throw IllegalStateException("Zadaj ID hlasu pre ElevenLabs")
-                prehrajMp3(elevenTts(text, hlas), gen)
+                prehrajMp3(zCache("e", hlas, text) { elevenTts(text, hlas) }, gen)
             }
         }
     }
@@ -218,6 +253,7 @@ object Dabing {
                 .put("responseModalities", JSONArray().put("AUDIO"))
                 .put("speechConfig", JSONObject().put("voiceConfig", JSONObject()
                     .put("prebuiltVoiceConfig", JSONObject().put("voiceName", hlas)))))
+        Spotreba.pridaj("hlasGemini")
         val odpoved = post(
             "https://generativelanguage.googleapis.com/v1beta/models/$ttsModel:generateContent",
             mapOf("x-goog-api-key" to kluc), telo.toString(), 15000
@@ -233,6 +269,7 @@ object Dabing {
 
     private fun elevenTts(text: String, hlas: String): ByteArray {
         if (elevenKlic.isBlank()) throw IllegalStateException("Chýba ElevenLabs API kľúč")
+        Spotreba.pridaj("hlasEleven"); Spotreba.pridaj("znakyEleven", text.length)
         val telo = JSONObject().put("text", text).put("model_id", ELEVEN_MODEL)
         return post(
             "https://api.elevenlabs.io/v1/text-to-speech/$hlas?output_format=mp3_44100_128",

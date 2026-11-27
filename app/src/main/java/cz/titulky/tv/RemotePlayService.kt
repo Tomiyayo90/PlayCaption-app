@@ -2085,6 +2085,8 @@ class RemotePlayService : Service() {
 
     /** Snímek z Xboxu (vlákno dekodéru WebRTC): vyříznout oblast titulků a číst na vlákně služby. */
     private fun snimekXbox(f: org.webrtc.VideoFrame) {
+        // jednorazový preklad celej obrazovky (tlačidlo v aplikácii)
+        if (PrekladObrazovky.caka) PrekladObrazovky.snimek(f, nast.jazykNeboCs) { t -> ukaz(t, 12000) }
         // žlutý rámeček (volby, menu) – vlastní čtečka, titulky nijak nebrzdí
         if (Volby.zapnuto) runCatching { ctiVolbyXbox(f) }.onFailure { e -> ui.post { zapis("[CHYBA volby Xbox: ${e.message}]") } }
         try {

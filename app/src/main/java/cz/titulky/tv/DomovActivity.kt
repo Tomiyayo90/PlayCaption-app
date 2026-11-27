@@ -74,6 +74,9 @@ class DomovActivity : Activity() {
         }
         koren.addView(hra, Tema.lp(c, 12))
 
+        koren.addView(Tema.tlacidlo(c, "Preložiť obrazovku (menu, ciele, mobil v hre)", false) {
+            PrekladObrazovky.spusti(c)
+        }, Tema.lp(c, 12))
         koren.addView(Tema.tlacidlo(c, "Stmaviť obrazovku (šetrí batériu)", false) {
             startActivity(Intent(c, StmavenieActivity::class.java))
         }, Tema.lp(c, 12))
@@ -89,7 +92,24 @@ class DomovActivity : Activity() {
         riadok("Gemini preklad", kluc)
         riadok("Dabing", dabingZap)
         riadok("Pamäť prekladov: " + Gemini.pocetVPameti() + " viet", Gemini.pocetVPameti() > 0)
+        // zostávajúci čas vývojárskeho režimu LG (po vypršaní aplikácia na TV prestane fungovať)
+        val lgId = TvProfily.aktivniId
+        if (lgId != null) {
+            val cas = runCatching { LgDevUloziste(c).cas(lgId) }.getOrNull()
+            if (cas != null) {
+                val z = cas.zbyva(System.currentTimeMillis())
+                val h = z / 3600
+                val text = if (z <= 0) "LG vývojársky režim vypršal – obnov ho v LG aplikácii (Developer Mode)"
+                           else "LG vývojársky režim: zostáva ${h} h" + if (h < 12) " – čoskoro obnov" else ""
+                riadok(text, z > 12 * 3600)
+            }
+        }
         koren.addView(stav, Tema.lp(c))
+
+        koren.addView(Tema.nadpisSekcie(c, "Využitie"))
+        val sp = Tema.kartaBox(c)
+        for (r in Spotreba.riadky()) sp.addView(Tema.text(c, r, 14f, Tema.SLABY).apply { setPadding(0, Tema.dp(c, 3), 0, Tema.dp(c, 3)) })
+        koren.addView(sp, Tema.lp(c))
 
         koren.addView(Tema.tlacidlo(c, "⚙  Nastavenia prekladu a dabingu", false) {
             startActivity(Intent(c, GeminiNastaveniActivity::class.java))

@@ -15,6 +15,45 @@ import android.widget.TextView
 /** Nastavenia prekladu (Gemini), hry a dabingu – prehľadné sekcie v modro-čiernom vzhľade. */
 class GeminiNastaveniActivity : Activity() {
 
+    private var vysledokRef: TextView? = null
+
+    private val KOD_EXPORT = 7101
+    private val KOD_IMPORT = 7102
+
+    private fun spustiExport() {
+        val i = android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(android.content.Intent.EXTRA_TITLE, "slovakcaption-preklady.json")
+        }
+        startActivityForResult(i, KOD_EXPORT)
+    }
+
+    private fun spustiImport() {
+        val i = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        startActivityForResult(i, KOD_IMPORT)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        val msg = try {
+            if (requestCode == KOD_EXPORT) {
+                contentResolver.openOutputStream(uri)?.use { it.write(Gemini.exportuj().toByteArray(Charsets.UTF_8)) }
+                "Exportované."
+            } else if (requestCode == KOD_IMPORT) {
+                val txt = contentResolver.openInputStream(uri)!!.use { String(it.readBytes(), Charsets.UTF_8) }
+                "Importovaných záznamov: " + Gemini.importuj(txt)
+            } else return
+        } catch (e: Exception) { "Chyba: " + (e.message ?: e.javaClass.simpleName) }
+        vysledokRef?.text = msg
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val c = this
@@ -111,6 +150,8 @@ class GeminiNastaveniActivity : Activity() {
         val elZena = Tema.pole(c, Dabing.elevenHlasZena); dab.addView(elZena)
         dab.addView(popis("ElevenLabs ID mužského hlasu"))
         val elMuz = Tema.pole(c, Dabing.elevenHlasMuz); dab.addView(elMuz)
+        dab.addView(popis("Hlasy postáv ručne (každý riadok: Postava=Hlas, napr. Jason=Charon; pri ElevenLabs ID hlasu)"))
+        val rucne = Tema.pole(c, Dabing.rucneHlasy, viac = true); dab.addView(rucne)
         koren.addView(dab, Tema.lp(c))
 
         // ---- Akcie
@@ -133,6 +174,7 @@ class GeminiNastaveniActivity : Activity() {
             Dabing.elevenKlic = elKlic.text.toString()
             Dabing.elevenHlasZena = elZena.text.toString()
             Dabing.elevenHlasMuz = elMuz.text.toString()
+            Dabing.rucneHlasy = rucne.text.toString()
         }
         koren.addView(Tema.nadpisSekcie(c, "Akcie"))
         koren.addView(Tema.tlacidlo(c, "Uložiť", true) { ulozVsetko(); vysledok.text = "Uložené." }, Tema.lp(c))
@@ -158,7 +200,21 @@ class GeminiNastaveniActivity : Activity() {
         koren.addView(Tema.tlacidlo(c, "Vymazať pamäť prekladov", false) {
             Gemini.vymazPamet(); vysledok.text = "Pamäť vymazaná."
         }, Tema.lp(c, 10))
+        koren.addView(Tema.tlacidlo(c, "Vymazať uložené hlasy (" + (Dabing.velkostHlasov() / 1024) + " kB)", false) {
+            Dabing.vymazHlasy(); vysledok.text = "Uložené hlasy vymazané."
+        }, Tema.lp(c, 10))
+        koren.addView(Tema.tlacidlo(c, "Exportovať pamäť prekladov", false) {
+            Gemini.uloz()
+            spustiExport()
+        }, Tema.lp(c, 10))
+        koren.addView(Tema.tlacidlo(c, "Importovať pamäť prekladov", false) {
+            spustiImport()
+        }, Tema.lp(c, 10))
+        koren.addView(Tema.nadpisSekcie(c, "Využitie"))
+        for (r in Spotreba.riadky()) koren.addView(Tema.text(c, r, 14f, Tema.SLABY))
+        koren.addView(Tema.tlacidlo(c, "Vynulovať počítadlá", false) { Spotreba.vynuluj(); vysledok.text = "Počítadlá vynulované." }, Tema.lp(c, 10))
         koren.addView(vysledok)
+        vysledokRef = vysledok
 
         setContentView(ScrollView(c).apply { background = Tema.pozadie(); addView(koren) })
     }

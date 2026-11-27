@@ -562,6 +562,12 @@ class TelefonActivity : Activity() {
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
         )
         obal.addView(
+            gTlacidlo("Preložiť obrazovku (menu, ciele, mobil v hre)", false) {
+                PrekladObrazovky.spusti(this@TelefonActivity)
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) }
+        )
+        obal.addView(
             gTlacidlo("Stmaviť obrazovku (šetrí batériu)", false) {
                 startActivity(android.content.Intent(this@TelefonActivity, StmavenieActivity::class.java))
             },

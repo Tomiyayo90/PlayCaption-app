@@ -33,6 +33,7 @@ object Gemini {
         prefs = app.getSharedPreferences("gemini", Context.MODE_PRIVATE)
         val f = File(app.filesDir, "gemini_cache.json")
         subor = f
+        Spotreba.init(app)
         Dabing.init(app)
         runCatching {
             if (f.exists()) {
@@ -47,8 +48,8 @@ object Gemini {
     }
 
     var klic: String
-        get() = prefs?.getString("klic", "") ?: ""
-        set(v) { prefs?.edit()?.putString("klic", v.trim())?.apply() }
+        get() = Sifra.desifruj(prefs?.getString("klic", "") ?: "")
+        set(v) { prefs?.edit()?.putString("klic", Sifra.zasifruj(v.trim()))?.apply() }
 
     var zapnute: Boolean
         get() = prefs?.getBoolean("zapnute", true) ?: true
@@ -101,7 +102,7 @@ object Gemini {
         if (!pripravene()) return null
         val kluc = jazyk + "|" + kontext(jazyk).hashCode() + "|" + text
         val zPamete = synchronized(pamet) { pamet[kluc] }
-        if (zPamete != null) { zapamataj(text); return zPamete }
+        if (zPamete != null) { zapamataj(text); Spotreba.pridaj("pamet"); return zPamete }
         if (System.currentTimeMillis() < pauzaDo) return null
         val vysledok = try {
             volaj(text, jazyk).also { poslednaChyba = "" }
@@ -111,6 +112,7 @@ object Gemini {
             null
         }
         if (vysledok != null) {
+            Spotreba.pridaj("preklady")
             synchronized(pamet) { pamet[kluc] = vysledok }
             zapamataj(text)
             neulozene++
@@ -129,13 +131,66 @@ object Gemini {
         }
     }
 
-    private fun uloz() {
+    fun uloz() {
         val f = subor ?: return
         runCatching {
             val o = JSONObject()
             synchronized(pamet) { for ((k, v) in pamet) o.put(k, v) }
             f.writeText(o.toString())
         }
+    }
+
+    /** Pamäť prekladov ako JSON text (na zálohu). */
+    fun exportuj(): String {
+        val o = JSONObject()
+        synchronized(pamet) { for ((k, v) in pamet) o.put(k, v) }
+        return o.toString()
+    }
+
+    /** Pridá preklady zo zálohy; vráti počet načítaných záznamov. */
+    fun importuj(json: String): Int {
+        val o = JSONObject(json)
+        var n = 0
+        val kluce = o.keys()
+        synchronized(pamet) {
+            while (kluce.hasNext()) { val k = kluce.next(); pamet[k] = o.getString(k); n++ }
+        }
+        uloz()
+        return n
+    }
+
+    /** Preklad textu z obrazovky (menu, ciele misií, mobil v hre) cez obrázok. */
+    fun obrazok(jpeg: ByteArray, jazyk: String): String {
+        val system = "You read screenshots of a video game. Find ALL meaningful on-screen text " +
+            "(menus, mission objectives, hints, in-game phone messages, map/GPS labels, subtitles) " +
+            "and translate it into ${nazovJazyka(jazyk)}. Return only the translation as short lines, " +
+            "no explanations. Skip logos and decoration. If there is no text, return a single dash.\n\n" +
+            "Game context:\n" + kontext(jazyk)
+        val img = JSONObject().put("inlineData", JSONObject().put("mimeType", "image/jpeg")
+            .put("data", android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP)))
+        val telo = JSONObject()
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+            .put("contents", JSONArray().put(JSONObject().put("role", "user")
+                .put("parts", JSONArray().put(img).put(JSONObject().put("text", "Translate the text on this screen.")))))
+            .put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", 600))
+        val s = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
+            .openConnection() as HttpURLConnection
+        try {
+            s.connectTimeout = 6000; s.readTimeout = 25000
+            s.requestMethod = "POST"; s.doOutput = true
+            s.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            s.setRequestProperty("x-goog-api-key", klic)
+            s.outputStream.use { it.write(telo.toString().toByteArray(Charsets.UTF_8)) }
+            val kod = s.responseCode
+            val prud = if (kod in 200..299) s.inputStream else s.errorStream
+            val odp = prud?.bufferedReader()?.use { it.readText() } ?: ""
+            if (kod !in 200..299) throw IllegalStateException("HTTP $kod: " + odp.take(200))
+            val casti = JSONObject(odp).getJSONArray("candidates").getJSONObject(0)
+                .getJSONObject("content").getJSONArray("parts")
+            val sb = StringBuilder()
+            for (i in 0 until casti.length()) sb.append(casti.getJSONObject(i).optString("text", ""))
+            return sb.toString().trim().ifEmpty { "-" }
+        } finally { s.disconnect() }
     }
 
     fun nazovJazyka(kod: String): String = when (kod) {

@@ -134,7 +134,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = Tema.pozadie()
             addView(ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.logo)
+                setImageResource(R.drawable.ikona_slovak)
                 adjustViewBounds = true
             }, LinearLayout.LayoutParams(if (telefon) dp(380) else dp(520), ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(drazka, LinearLayout.LayoutParams(dp(340), dp(10)).apply { topMargin = dp(36) })
@@ -218,7 +218,7 @@ class MainActivity : Activity() {
         val stred = svisle().apply {
             gravity = Gravity.CENTER
             addView(ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.logo); adjustViewBounds = true
+                setImageResource(R.drawable.ikona_slovak); adjustViewBounds = true
             }, LinearLayout.LayoutParams(if (telefon) dp(300) else dp(340), ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(box, LinearLayout.LayoutParams(if (telefon) ViewGroup.LayoutParams.MATCH_PARENT else dp(1250), ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(30) })
             // nemizí samo – člověk potvrdí, že si to přečetl
@@ -351,7 +351,7 @@ class MainActivity : Activity() {
             background = vyber(Color.TRANSPARENT, radius = 18f)
             setPadding(dp(8), dp(6), dp(8), dp(6))
             addView(ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.logo)
+                setImageResource(R.drawable.ikona_slovak)
                 adjustViewBounds = true
             }, FrameLayout.LayoutParams(dp(if (telefon) 230 else 140), ViewGroup.LayoutParams.WRAP_CONTENT))
             setOnClickListener { Zaznam.ukaz(this@MainActivity) }
@@ -1881,7 +1881,7 @@ class MainActivity : Activity() {
     }
 
     private fun nadpisLogo() = ImageView(this).apply {
-        setImageResource(R.drawable.logo)
+        setImageResource(R.drawable.ikona_slovak)
         adjustViewBounds = true
         layoutParams = LinearLayout.LayoutParams(dp(260), ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(14) }
     }
