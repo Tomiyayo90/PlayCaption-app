@@ -6,6 +6,8 @@
         var yellow = document.getElementById("choice-frame");
         var blue = document.getElementById("ocr-frame");
         var subtitle = document.getElementById("subtitle");
+        var blocksBox = document.getElementById("blocks");
+        var blocksUntil = 0, lastBlocksId = null;
         var lastChoiceId = null;
         var lastFrameMode = 0;
         var choicesUntil = 0, yellowUntil = 0, blueUntil = 0, greenUntil = 0;
@@ -81,7 +83,46 @@
             choices.style.top = (Math.max(0.01, Math.min(top, 0.99 - height)) * 100) + "%";
         }
 
+        function argb(value) {
+            var v = value >>> 0;
+            return "rgba(" + [(v >>> 16) & 255, (v >>> 8) & 255, v & 255, ((v >>> 24) / 255).toFixed(3)].join(",") + ")";
+        }
+
+        // Přeložené texty se kreslí přesně na místo původních, v barvě jejich pozadí.
+        function paintBlocks(packet, now) {
+            if (!blocksBox) return;
+            if (packet.id === lastBlocksId) return;
+            lastBlocksId = packet.id;
+            blocksBox.textContent = "";
+            var viewport = document.documentElement.clientHeight || 1080;
+            packet.blocks.forEach(function (block) {
+                var node = document.createElement("div");
+                node.className = "blk";
+                node.style.left = (block.area[0] * 100) + "%";
+                node.style.top = (block.area[1] * 100) + "%";
+                node.style.width = ((block.area[2] - block.area[0]) * 100) + "%";
+                node.style.height = ((block.area[3] - block.area[1]) * 100) + "%";
+                node.style.background = argb(block.bg);
+                node.style.color = argb(block.fg);
+                node.textContent = block.text;
+                blocksBox.appendChild(node);
+                // Písmo se zmenšuje, dokud se text nevejde do rámečku.
+                var size = Math.max(14, Math.min(54, (block.area[3] - block.area[1]) * viewport * 0.78));
+                for (var i = 0; i < 14; i++) {
+                    node.style.fontSize = size + "px";
+                    if (!node.clientHeight || node.scrollHeight <= node.clientHeight + 1 || size <= 14) break;
+                    size = Math.max(14, size * 0.88);
+                }
+            });
+            blocksBox.hidden = packet.blocks.length === 0;
+            blocksUntil = packet.blocks.length ? now + packet.duration : 0;
+        }
+
         this.handle = function (packet, now) {
+            if (packet.kind === "blocks") {
+                paintBlocks(packet, now);
+                return true;
+            }
             if (packet.kind === "ocr") {
                 positionFrame(blue, packet.area);
                 blue.hidden = !packet.visible;
@@ -187,6 +228,7 @@
                 if (captionOffset < captionPacket.text.trimEnd().length) nextCaption(now);
                 else if (storyMode) { storyDone = true; captionPacket = null; subtitle.hidden = true; }
             }
+            if (blocksBox && blocksUntil && now >= blocksUntil) { blocksBox.hidden = true; blocksUntil = 0; }
             if (now >= choicesUntil) choices.hidden = true;
             if (now >= yellowUntil) yellow.hidden = true;
             if (now >= blueUntil) blue.hidden = true;
@@ -198,6 +240,8 @@
             if (storyMode && !storyDone) storyId = null;
             choices.hidden = true; yellow.hidden = true; blue.hidden = true;
             choices.textContent = "";
+            if (blocksBox) { blocksBox.hidden = true; blocksBox.textContent = ""; }
+            blocksUntil = 0; lastBlocksId = null;
             subtitle.style.outline = "";
             lastChoiceId = null; lastFrameMode = 0;
             choicesUntil = yellowUntil = blueUntil = greenUntil = 0;
