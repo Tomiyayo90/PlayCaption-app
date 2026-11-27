@@ -28,12 +28,12 @@ object PrekladObrazovky {
 
     private var prefs: android.content.SharedPreferences? = null
 
-    /** Automatický preklad: obrazovka sa preloží sama, keď sa zastaví a zmení (menu, mobil, ciele). */
+    /** Automatický preklad: text na obrazovke sa číta v telefóne a preklad sa ukáže v okne vedľa. */
     var automat: Boolean
         get() = prefs?.getBoolean("automat", false) ?: false
         set(v) {
             prefs?.edit()?.putBoolean("automat", v)?.apply()
-            if (!v) { predch = null; analyzovany = null; zobrazeno = false }
+            if (!v) { cakajuci = null; zobrazeno = false; prazdnych = 0 }
         }
 
     fun init(c: Context) {
@@ -41,22 +41,25 @@ object PrekladObrazovky {
         if (prefs == null) prefs = c.applicationContext.getSharedPreferences("preklad_obrazovky", Context.MODE_PRIVATE)
     }
 
-    // ---- ladenie citlivosti (podiel buniek, ktoré sa zmenili) ----
-    private const val STABILNE = 0.010      // medzi dvoma vzorkami menej = obraz stojí
-    private const val NOVY_OBSAH = 0.015    // oproti preloženému obrazu viac = nový obsah, treba preložiť
-    private const val INA_SCENA = 0.35      // viac = menu zmizlo, preklady sa schovajú
-    private const val MIN_ODSTUP_MS = 4000L // najmenší odstup medzi dvoma prekladmi
-    private const val MAX_ZA_MINUTU = 8     // poistka proti zbytočnému plateniu
+    // ---- ladenie ----
+    private const val INTERVAL_MS = 600L    // ako často sa číta obraz (OCR v telefóne je zadarmo)
+    private const val MIN_PISMEN = 20       // koľko písmen musí byť na obrazovke, aby to bolo menu/správa
+    private const val MAX_ZA_MINUTU = 12    // poistka proti zbytočným volaniam Gemini
+    private const val SIRKA_OKNA = 0.32f    // šírka okna s prekladom (podiel šírky obrazu)
 
     @Volatile private var posl = 0L
-    @Volatile private var predch: ByteArray? = null
-    @Volatile private var analyzovany: ByteArray? = null
     @Volatile private var zobrazeno = false
+    @Volatile private var zobrazeneSlova: Set<String> = emptySet()
+    @Volatile private var cakajuci: Set<String>? = null
+    @Volatile private var prazdnych = 0
     @Volatile private var poslanoKedy = 0L
-    @Volatile private var poslednyPreklad = 0L
     @Volatile private var posledneBloky: List<Propojeni.Vysilac.Blok> = emptyList()
     private val zaneprazdneny = java.util.concurrent.atomic.AtomicBoolean(false)
     private val casy = java.util.ArrayDeque<Long>()
+    private val rozpoznavac by lazy {
+        com.google.mlkit.vision.text.TextRecognition.getClient(
+            com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
 
     private fun toast(t: String) { app?.let { ui.post { Toast.makeText(it, t, Toast.LENGTH_LONG).show() } } }
 
@@ -78,75 +81,129 @@ object PrekladObrazovky {
     fun priSnimku(c: Context, f: org.webrtc.VideoFrame, jazyk: String, zobraz: (String) -> Unit) {
         if (prefs == null) init(c)
         if (caka) { snimek(f, jazyk, zobraz); return }
-        if (automat) runCatching { automaticky(f, jazyk, zobraz) }
+        if (automat) runCatching { automaticky(f, jazyk) }
     }
 
-    private fun odtlacok(f: org.webrtc.VideoFrame): ByteArray? {
-        val i = f.buffer.toI420() ?: return null
-        try {
-            val w = i.width; val h = i.height
-            val gx = 96; val gy = 54
-            val out = ByteArray(gx * gy)
-            val y = i.dataY.duplicate()
-            for (cy in 0 until gy) {
-                val py = (cy * 2 + 1) * h / (gy * 2)
-                for (cx in 0 until gx) {
-                    val px = (cx * 2 + 1) * w / (gx * 2)
-                    out[cy * gx + cx] = y.get(py * i.strideY + px)
-                }
-            }
-            return out
-        } finally { i.release() }
+    private class Kus(val text: String, val l: Float, val t: Float, val r: Float, val b: Float)
+
+    private fun slova(kusy: List<Kus>): Set<String> =
+        kusy.joinToString(" ") { it.text }.lowercase().split(Regex("[^\\p{L}]+")).filter { it.length >= 3 }.toSet()
+
+    private fun podobne(a: Set<String>, b: Set<String>): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        val spolu = a.count { it in b }
+        return spolu.toDouble() / (a.size + b.size - spolu) >= 0.7
     }
 
-    /** Podiel buniek, ktoré sa výrazne zmenili. */
-    private fun rozdiel(a: ByteArray, b: ByteArray): Double {
-        var n = 0
-        for (k in a.indices) if (Math.abs((a[k].toInt() and 0xFF) - (b[k].toInt() and 0xFF)) > 25) n++
-        return n.toDouble() / a.size
-    }
-
-    private fun automaticky(f: org.webrtc.VideoFrame, jazyk: String, zobraz: (String) -> Unit) {
+    private fun automaticky(f: org.webrtc.VideoFrame, jazyk: String) {
         val now = System.currentTimeMillis()
-        if (now - posl < 500) return
+        if (now - posl < INTERVAL_MS) return
         posl = now
         if (!Gemini.pripravene()) return
-        val o = odtlacok(f) ?: return
-        val p = predch
-        predch = o
-        if (p == null) return
-        val stabilny = rozdiel(p, o) < STABILNE
-        val a = analyzovany
-        val zmena = if (a == null) 1.0 else rozdiel(a, o)
-
-        // menu zmizlo / úplne iná scéna → preklady schovať
-        if (zobrazeno && zmena > INA_SCENA) {
-            zobrazeno = false
-            posledneBloky = emptyList()
-            Propojeni.Vysilac.poslatBloky(emptyList(), 1000)
-        }
-        // dlho stojace menu: preklady na TV po dvoch minútach vypršia, tak sa obnovia
-        if (zobrazeno && now - poslanoKedy > 90_000 && posledneBloky.isNotEmpty()) {
-            poslanoKedy = now
-            Propojeni.Vysilac.poslatBloky(posledneBloky, 120_000)
-        }
-        if (!stabilny || zmena < NOVY_OBSAH) return
-        if (now - poslednyPreklad < MIN_ODSTUP_MS) return
-        synchronized(casy) {
-            while (casy.isNotEmpty() && now - casy.peekFirst() > 60_000) casy.removeFirst()
-            if (casy.size >= MAX_ZA_MINUTU) return
-            casy.addLast(now)
-        }
         if (!zaneprazdneny.compareAndSet(false, true)) return
         val jpeg = try { naJpeg(f) } catch (_: Throwable) { null }
         if (jpeg == null) { zaneprazdneny.set(false); return }
-        analyzovany = o
-        poslednyPreklad = now
         Thread {
-            try { spracuj(jpeg, jazyk, zobraz, true) }
+            try { okno(jpeg, jazyk) }
             catch (_: Exception) { /* automat mlčí, chyby sa neukazujú pri každom snímku */ }
             finally { zaneprazdneny.set(false) }
         }.start()
+    }
+
+    /** Prečíta text z obrazu (OCR v telefóne) a nechá si ho preložiť. */
+    private fun okno(jpeg: ByteArray, jazyk: String) {
+        val plna = android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: return
+        val mala = if (plna.width > 1280) {
+            val m = android.graphics.Bitmap.createScaledBitmap(plna, 1280, plna.height * 1280 / plna.width, true)
+            plna.recycle(); m
+        } else plna
+        val w = mala.width.toFloat(); val h = mala.height.toFloat()
+        val vysledok = try {
+            com.google.android.gms.tasks.Tasks.await(
+                rozpoznavac.process(com.google.mlkit.vision.common.InputImage.fromBitmap(mala, 0)),
+                6, java.util.concurrent.TimeUnit.SECONDS)
+        } finally { mala.recycle() }
+        val oblastTit = if (Gemini.hraId == "gta6") floatArrayOf(0.17f, 0.78f, 0.82f, 0.95f) else null
+        val kusy = vysledok.textBlocks.mapNotNull { b ->
+            val r = b.boundingBox ?: return@mapNotNull null
+            val text = b.text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim()
+            if (text.count { it.isLetter() } < 3) return@mapNotNull null
+            val k = Kus(text, r.left / w, r.top / h, r.right / w, r.bottom / h)
+            // dialógové titulky dole v strede rieši bežný preklad titulkov
+            if (oblastTit != null && (k.l + k.r) / 2 in oblastTit[0]..oblastTit[2] &&
+                (k.t + k.b) / 2 in oblastTit[1]..oblastTit[3] && k.b - k.t < 0.07f) return@mapNotNull null
+            k
+        }.sortedWith(compareBy<Kus>({ it.t }, { it.l })).take(14)
+
+        val pismen = kusy.sumOf { k -> k.text.count { it.isLetter() } }
+        if (pismen < MIN_PISMEN) {
+            cakajuci = null
+            prazdnych++
+            if (zobrazeno && prazdnych >= 3) {
+                zobrazeno = false; posledneBloky = emptyList(); zobrazeneSlova = emptySet()
+                Propojeni.Vysilac.poslatBloky(emptyList(), 1000)
+            }
+            return
+        }
+        prazdnych = 0
+        val sig = slova(kusy)
+        val ted = System.currentTimeMillis()
+        // už zobrazené: iba obnoviť, keď preklady na TV po dvoch minútach vypršia
+        if (zobrazeno && podobne(sig, zobrazeneSlova)) {
+            cakajuci = null
+            if (ted - poslanoKedy > 90_000 && posledneBloky.isNotEmpty()) {
+                poslanoKedy = ted
+                Propojeni.Vysilac.poslatBloky(posledneBloky, 120_000)
+            }
+            return
+        }
+        // nový obsah: počkať na druhé rovnaké čítanie (kamera sa chvíľu hýbe, OCR kolíše)
+        val c = cakajuci
+        if (c == null || !podobne(sig, c)) { cakajuci = sig; return }
+        cakajuci = null
+        synchronized(casy) {
+            while (casy.isNotEmpty() && ted - casy.peekFirst() > 60_000) casy.removeFirst()
+            if (casy.size >= MAX_ZA_MINUTU) return
+            casy.addLast(ted)
+        }
+        val preklady = Gemini.prelozViac(kusy.map { it.text }, jazyk)
+        Spotreba.pridaj("obrazovky")
+        val bloky = rozlozOkno(kusy, preklady)
+        if (Propojeni.Vysilac.poslatBloky(bloky, 120_000)) {
+            zobrazeno = true; zobrazeneSlova = sig; posledneBloky = bloky; poslanoKedy = System.currentTimeMillis()
+        }
+    }
+
+    /** Okno vedľa pôvodného textu: svetlý panel s bublinami, ako v GlossaSub. */
+    private fun rozlozOkno(kusy: List<Kus>, preklady: List<String>): List<Propojeni.Vysilac.Blok> {
+        val ul = kusy.minOf { it.l }; val ur = kusy.maxOf { it.r }; val ut = kusy.minOf { it.t }
+        val volneVlavo = ul; val volneVpravo = 1f - ur
+        val sirka = SIRKA_OKNA
+        val x = if (volneVlavo >= volneVpravo) maxOf(0.02f, minOf(ul - sirka - 0.015f, 0.4f)).coerceAtLeast(0.02f)
+                else minOf(1f - sirka - 0.02f, maxOf(ur + 0.015f, 0.6f))
+        val vrch = ut.coerceIn(0.06f, 0.30f)
+        // odhad výšky bubliny: ~30 px písmo, riadky podľa šírky okna (obraz 1920 × 1080)
+        val znakovNaRiadok = (sirka * 1920f * 0.9f / (30f * 0.52f)).toInt().coerceAtLeast(12)
+        val vysky = preklady.map { t ->
+            val riadkov = Math.ceil(t.length.toDouble() / znakovNaRiadok).toInt().coerceAtLeast(1)
+            ((riadkov * 30f * 1.2f + 26f) / 1080f)
+        }
+        val medzera = 0.012f
+        var spolu = vysky.sum() + medzera * (vysky.size - 1)
+        val maxVyska = 0.86f - vrch
+        val mierka = if (spolu > maxVyska) maxVyska / spolu else 1f
+        spolu *= mierka
+        val spodok = vrch + spolu + 0.05f
+        val vysl = ArrayList<Propojeni.Vysilac.Blok>()
+        vysl.add(Propojeni.Vysilac.Blok(x, vrch - 0.02f, x + sirka, spodok, 0xF2EAF0FA.toInt(), 0xFF111827.toInt(), ""))
+        var y = vrch
+        for ((i, t) in preklady.withIndex()) {
+            val v = vysky[i] * mierka
+            vysl.add(Propojeni.Vysilac.Blok(x + 0.012f, y, x + sirka - 0.012f, y + v, 0xFFD3D8E0.toInt(), 0xFF111827.toInt(), t))
+            y += v + medzera * mierka
+        }
+        vysl.add(Propojeni.Vysilac.Blok(x, spodok - 0.032f, x + sirka, spodok - 0.006f, 0x00000000, 0xFF7A8499.toInt(), "SlovakCaption · Slovenčina"))
+        return vysl
     }
 
     /**

@@ -189,6 +189,88 @@ object Gemini {
         } finally { s.disconnect() }
     }
 
+    @Volatile private var bezThinking = false
+
+    /**
+     * Preloží viac krátkych textov z obrazovky naraz (menu, správy z mobilu, ciele). Jedno volanie,
+     * hotové vety sa berú z pamäte. Vráti preklady v rovnakom poradí.
+     */
+    fun prelozViac(texty: List<String>, jazyk: String): List<String> {
+        if (!pripravene()) throw IllegalStateException("Gemini nie je pripravené")
+        val kont = kontext(jazyk).hashCode()
+        fun kluc(t: String) = jazyk + "|" + kont + "|" + t
+        val vysl = arrayOfNulls<String>(texty.size)
+        val chyba = ArrayList<Int>()
+        synchronized(pamet) {
+            for (i in texty.indices) {
+                val z = pamet[kluc(texty[i])]
+                if (z != null) vysl[i] = z else chyba.add(i)
+            }
+        }
+        Spotreba.pridaj("pamet", texty.size - chyba.size)
+        if (chyba.isNotEmpty()) {
+            val system = "You translate on-screen texts of a video game interface (menus, phone messages, mission " +
+                "objectives, hints) into ${nazovJazyka(jazyk)}. The input is a JSON array of strings; return ONLY a JSON " +
+                "array of strings with exactly the same length and order. Short and natural, keep names, numbers and " +
+                "codes unchanged. If a string is already in ${nazovJazyka(jazyk)}, return it as is. " +
+                "Texts come from OCR and may contain small errors, fix them silently.\n\nGame context:\n" + kontext(jazyk)
+            val vstup = JSONArray()
+            for (i in chyba) vstup.put(texty[i])
+            var odp = volajText(system, vstup.toString(), 2500)
+            odp = odp.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val od = odp.indexOf('['); val do_ = odp.lastIndexOf(']')
+            if (od < 0 || do_ <= od) throw IllegalStateException("Neplatná odpoveď: " + odp.take(120))
+            val pole = JSONArray(odp.substring(od, do_ + 1))
+            if (pole.length() != chyba.size) throw IllegalStateException("Počet prekladov nesedí")
+            Spotreba.pridaj("preklady", chyba.size)
+            synchronized(pamet) {
+                for ((n, i) in chyba.withIndex()) {
+                    val p = pole.optString(n, "").trim()
+                    if (p.isNotEmpty()) { vysl[i] = p; pamet[kluc(texty[i])] = p }
+                }
+            }
+            neulozene += chyba.size
+            if (neulozene >= 15) { neulozene = 0; Thread { uloz() }.start() }
+        }
+        return vysl.mapIndexed { i, v -> v ?: texty[i] }
+    }
+
+    /** Textové volanie so zapnutým JSON režimom; rozmýšľanie sa vypína kvôli rýchlosti, ak ho model podporuje. */
+    private fun volajText(system: String, user: String, maxTokenov: Int): String {
+        fun pokus(bezMyslenia: Boolean): String {
+            val konfig = JSONObject().put("temperature", 0.2).put("maxOutputTokens", maxTokenov)
+                .put("responseMimeType", "application/json")
+            if (bezMyslenia) konfig.put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
+            val telo = JSONObject()
+                .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+                .put("contents", JSONArray().put(JSONObject().put("role", "user")
+                    .put("parts", JSONArray().put(JSONObject().put("text", user)))))
+                .put("generationConfig", konfig)
+            val s = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
+                .openConnection() as HttpURLConnection
+            try {
+                s.connectTimeout = 4000; s.readTimeout = 15000
+                s.requestMethod = "POST"; s.doOutput = true
+                s.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                s.setRequestProperty("x-goog-api-key", klic)
+                s.outputStream.use { it.write(telo.toString().toByteArray(Charsets.UTF_8)) }
+                val kod = s.responseCode
+                val prud = if (kod in 200..299) s.inputStream else s.errorStream
+                val odp = prud?.bufferedReader()?.use { it.readText() } ?: ""
+                if (kod !in 200..299) throw IllegalStateException("HTTP $kod: " + odp.take(200))
+                val casti = JSONObject(odp).getJSONArray("candidates").getJSONObject(0)
+                    .getJSONObject("content").getJSONArray("parts")
+                val sb = StringBuilder()
+                for (i in 0 until casti.length()) sb.append(casti.getJSONObject(i).optString("text", ""))
+                return sb.toString().trim()
+            } finally { s.disconnect() }
+        }
+        if (bezThinking) return pokus(false)
+        return try { pokus(true) } catch (e: IllegalStateException) {
+            if (e.message?.startsWith("HTTP 400") == true) { bezThinking = true; pokus(false) } else throw e
+        }
+    }
+
     /** Text z obrazovky s polohou: súradnice sú podiel šírky/výšky obrazu (0..1). */
     class Textik(val l: Float, val t: Float, val r: Float, val b: Float, val text: String)
 
