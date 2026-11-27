@@ -38,6 +38,7 @@ UI hints, button prompts and mission objectives should be short and imperative."
         prefs = app.getSharedPreferences("gemini", Context.MODE_PRIVATE)
         val f = File(app.filesDir, "gemini_cache.json")
         subor = f
+        Dabing.init(app)
         runCatching {
             if (f.exists()) {
                 val o = JSONObject(f.readText())

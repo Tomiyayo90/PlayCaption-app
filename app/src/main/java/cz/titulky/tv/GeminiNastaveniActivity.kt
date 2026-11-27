@@ -4,14 +4,16 @@ import android.app.Activity
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 
-/** Jednoduchá obrazovka s nastaveniami Gemini (kľúč, model, kontext hry). Má vlastnú ikonu v zozname aplikácií. */
+/** Nastavenia Gemini prekladu a dabingu. Má vlastnú ikonu v zozname aplikácií. */
 class GeminiNastaveniActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,6 +27,11 @@ class GeminiNastaveniActivity : Activity() {
         }
 
         fun popis(t: String) = TextView(this).apply { text = t; textSize = 14f; setPadding(0, sirka, 0, 4) }
+        fun pole(hodnota: String, heslo: Boolean = false) = EditText(this).apply {
+            setText(hodnota)
+            setSingleLine(true)
+            if (heslo) inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
 
         koren.addView(TextView(this).apply { text = "Gemini nastavenia"; textSize = 22f })
 
@@ -35,16 +42,12 @@ class GeminiNastaveniActivity : Activity() {
         }
         koren.addView(prepinac)
 
-        koren.addView(popis("API kľúč (zo aistudio.google.com/apikey)"))
-        val klic = EditText(this).apply {
-            setText(Gemini.klic)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setSingleLine(true)
-        }
+        koren.addView(popis("API kľúč (aistudio.google.com/apikey)"))
+        val klic = pole(Gemini.klic, heslo = true)
         koren.addView(klic)
 
-        koren.addView(popis("Model"))
-        val model = EditText(this).apply { setText(Gemini.model); setSingleLine(true) }
+        koren.addView(popis("Model prekladu"))
+        val model = pole(Gemini.model)
         koren.addView(model)
 
         koren.addView(popis("Kontext hry (pomáha prekladu)"))
@@ -56,12 +59,38 @@ class GeminiNastaveniActivity : Activity() {
         }
         koren.addView(kontext)
 
+        koren.addView(TextView(this).apply { text = "Dabing"; textSize = 20f; setPadding(0, sirka * 2, 0, 0) })
+        koren.addView(popis("Hlas (prehráva sa v telefóne, napr. v slúchadlách)"))
+        val rezim = Spinner(this).apply {
+            adapter = ArrayAdapter(this@GeminiNastaveniActivity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("Vypnuté", "Gemini hlas", "ElevenLabs hlas"))
+            setSelection(Dabing.rezim.coerceIn(0, 2))
+        }
+        koren.addView(rezim)
+        koren.addView(popis("Model Gemini hlasu"))
+        val ttsModel = pole(Dabing.ttsModel)
+        koren.addView(ttsModel)
+        koren.addView(popis("ElevenLabs API kľúč (len pre ElevenLabs)"))
+        val elKlic = pole(Dabing.elevenKlic, heslo = true)
+        koren.addView(elKlic)
+        koren.addView(popis("ElevenLabs ID ženského hlasu"))
+        val elZena = pole(Dabing.elevenHlasZena)
+        koren.addView(elZena)
+        koren.addView(popis("ElevenLabs ID mužského hlasu"))
+        val elMuz = pole(Dabing.elevenHlasMuz)
+        koren.addView(elMuz)
+
         val vysledok = TextView(this).apply { textSize = 14f; setPadding(0, sirka, 0, sirka) }
         fun ulozVsetko() {
             Gemini.zapnute = prepinac.isChecked
             Gemini.klic = klic.text.toString()
             Gemini.model = model.text.toString()
             Gemini.kontext = kontext.text.toString()
+            Dabing.rezim = rezim.selectedItemPosition
+            Dabing.ttsModel = ttsModel.text.toString()
+            Dabing.elevenKlic = elKlic.text.toString()
+            Dabing.elevenHlasZena = elZena.text.toString()
+            Dabing.elevenHlasMuz = elMuz.text.toString()
         }
 
         koren.addView(Button(this).apply {
@@ -75,9 +104,22 @@ class GeminiNastaveniActivity : Activity() {
                 vysledok.text = "Testujem..."
                 val jazyk = Nastaveni(this@GeminiNastaveniActivity).jazykNeboCs
                 Thread {
-                    val text = try { "Funguje (" + jazyk + "): " + Gemini.test(jazyk) }
+                    val v = try { "Funguje (" + jazyk + "): " + Gemini.test(jazyk) }
                     catch (e: Exception) { "Chyba: " + (e.message ?: e.javaClass.simpleName) }
-                    runOnUiThread { vysledok.text = text }
+                    runOnUiThread { vysledok.text = v }
+                }.start()
+            }
+        })
+        koren.addView(Button(this).apply {
+            text = "Otestovať dabing"
+            setOnClickListener {
+                ulozVsetko()
+                if (Dabing.rezim == Dabing.VYPNUTE) { vysledok.text = "Dabing je vypnutý."; return@setOnClickListener }
+                vysledok.text = "Generujem hlas..."
+                Thread {
+                    val v = try { Dabing.test(); "Dabing prehraný." }
+                    catch (e: Exception) { "Chyba: " + (e.message ?: e.javaClass.simpleName) }
+                    runOnUiThread { vysledok.text = v }
                 }.start()
             }
         })

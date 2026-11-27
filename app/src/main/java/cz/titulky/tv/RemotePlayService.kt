@@ -1294,6 +1294,7 @@ class RemotePlayService : Service() {
             if (dobry) dobryHotov = true
             posledniUkazany = cislo
             ukazCesky(cesky, box, radku, barvyJmen)
+            if (dobry) Dabing.povedz(cesky)
         }
         // 1) hned rychlý překlad z televize (~0,2 s), 2) pak ho nahradí lepší z Googlu
         // rychlý překlad ukázat, jen když Google do 0,15 s neodpoví – jinak by titulek "problikl"
