@@ -198,13 +198,13 @@ object Gemini {
     fun prelozViac(texty: List<String>, jazyk: String): List<String> {
         if (!pripravene()) throw IllegalStateException("Gemini nie je pripravené")
         val kont = kontext(jazyk).hashCode()
-        fun kluc(t: String) = jazyk + "|" + kont + "|" + t
+        fun kluc(t: String) = "ui|" + jazyk + "|" + kont + "|" + t
         val vysl = arrayOfNulls<String>(texty.size)
         val chyba = ArrayList<Int>()
         synchronized(pamet) {
             for (i in texty.indices) {
                 val z = pamet[kluc(texty[i])]
-                if (z != null) vysl[i] = z else chyba.add(i)
+                if (z != null) vysl[i] = if (z == "\u0001") "" else z else chyba.add(i)
             }
         }
         Spotreba.pridaj("pamet", texty.size - chyba.size)
@@ -213,6 +213,9 @@ object Gemini {
                 "objectives, hints) into ${nazovJazyka(jazyk)}. The input is a JSON array of strings; return ONLY a JSON " +
                 "array of strings with exactly the same length and order. Short and natural, keep names, numbers and " +
                 "codes unchanged. If a string is already in ${nazovJazyka(jazyk)}, return it as is. " +
+                "Return an EMPTY string \"\" for anything that is not readable content: map or street place names, " +
+                "button prompts (RECENTER, SET DESTINATION, BACK, SCROLL, EXIT...), tab or menu-bar names, a lone " +
+                "character name, money amounts, distances, times, numbers and other HUD labels. " +
                 "Texts come from OCR and may contain small errors, fix them silently.\n\nGame context:\n" + kontext(jazyk)
             val vstup = JSONArray()
             for (i in chyba) vstup.put(texty[i])
@@ -226,7 +229,8 @@ object Gemini {
             synchronized(pamet) {
                 for ((n, i) in chyba.withIndex()) {
                     val p = pole.optString(n, "").trim()
-                    if (p.isNotEmpty()) { vysl[i] = p; pamet[kluc(texty[i])] = p }
+                    vysl[i] = p
+                    pamet[kluc(texty[i])] = if (p.isEmpty()) "\u0001" else p
                 }
             }
             neulozene += chyba.size

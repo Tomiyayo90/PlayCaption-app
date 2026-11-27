@@ -45,7 +45,8 @@ object PrekladObrazovky {
     private const val INTERVAL_MS = 600L    // ako často sa číta obraz (OCR v telefóne je zadarmo)
     private const val MIN_PISMEN = 20       // koľko písmen musí byť na obrazovke, aby to bolo menu/správa
     private const val MAX_ZA_MINUTU = 12    // poistka proti zbytočným volaniam Gemini
-    private const val SIRKA_OKNA = 0.32f    // šírka okna s prekladom (podiel šírky obrazu)
+    private const val SIRKA_OKNA = 0.20f    // šírka okna s prekladom (podiel šírky obrazu)
+    private const val PISMO_PX = 20f        // približná veľkosť písma v okne (obraz 1920 × 1080)
 
     @Volatile private var posl = 0L
     @Volatile private var zobrazeno = false
@@ -84,7 +85,7 @@ object PrekladObrazovky {
         if (automat) runCatching { automaticky(f, jazyk) }
     }
 
-    private class Kus(val text: String, val l: Float, val t: Float, val r: Float, val b: Float)
+    private class Kus(val text: String, val l: Float, val t: Float, val r: Float, val b: Float, val moje: Boolean = false)
 
     private fun slova(kusy: List<Kus>): Set<String> =
         kusy.joinToString(" ") { it.text }.lowercase().split(Regex("[^\\p{L}]+")).filter { it.length >= 3 }.toSet()
@@ -124,14 +125,27 @@ object PrekladObrazovky {
                 6, java.util.concurrent.TimeUnit.SECONDS)
         } finally { mala.recycle() }
         val oblastTit = if (Gemini.hraId == "gta6") floatArrayOf(0.17f, 0.78f, 0.82f, 0.95f) else null
+        val meno = Regex("^(Jason|Lucia)\\b[:\\s]*(.*)$", RegexOption.IGNORE_CASE)
         val kusy = vysledok.textBlocks.mapNotNull { b ->
             val r = b.boundingBox ?: return@mapNotNull null
-            val text = b.text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim()
+            var text = b.text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim()
+            var moje = false
+            // správa, ktorú posielam ja: pred textom je meno hráča (Jason / Lucia)
+            val m = meno.find(text)
+            if (m != null && m.groupValues[2].isNotBlank()) { moje = true; text = m.groupValues[2].trim() }
             if (text.count { it.isLetter() } < 3) return@mapNotNull null
-            val k = Kus(text, r.left / w, r.top / h, r.right / w, r.bottom / h)
+            val k = Kus(text, r.left / w, r.top / h, r.right / w, r.bottom / h, moje)
+            val sx = (k.l + k.r) / 2; val sy = (k.t + k.b) / 2
+            // HUD: lišta kariet hore, peniaze vpravo hore, nápovedy tlačidiel vpravo dole
+            if (sy < 0.13f) return@mapNotNull null
+            if (sx > 0.78f && sy < 0.22f) return@mapNotNull null
+            if (sx > 0.70f && sy > 0.60f) return@mapNotNull null
+            // krátky nápis iba veľkými písmenami (tlačidlo, záložka) nie je obsah
+            val slov = text.split(' ').size
+            if (slov <= 2 && text.none { it.isLowerCase() }) return@mapNotNull null
             // dialógové titulky dole v strede rieši bežný preklad titulkov
-            if (oblastTit != null && (k.l + k.r) / 2 in oblastTit[0]..oblastTit[2] &&
-                (k.t + k.b) / 2 in oblastTit[1]..oblastTit[3] && k.b - k.t < 0.07f) return@mapNotNull null
+            if (oblastTit != null && sx in oblastTit[0]..oblastTit[2] && sy in oblastTit[1]..oblastTit[3] && k.b - k.t < 0.07f)
+                return@mapNotNull null
             k
         }.sortedWith(compareBy<Kus>({ it.t }, { it.l })).take(14)
 
@@ -139,9 +153,12 @@ object PrekladObrazovky {
         if (pismen < MIN_PISMEN) {
             cakajuci = null
             prazdnych++
-            if (zobrazeno && prazdnych >= 3) {
-                zobrazeno = false; posledneBloky = emptyList(); zobrazeneSlova = emptySet()
-                Propojeni.Vysilac.poslatBloky(emptyList(), 1000)
+            if (prazdnych >= 3) {
+                zobrazeneSlova = emptySet()
+                if (zobrazeno) {
+                    zobrazeno = false; posledneBloky = emptyList()
+                    Propojeni.Vysilac.poslatBloky(emptyList(), 1000)
+                }
             }
             return
         }
@@ -149,9 +166,9 @@ object PrekladObrazovky {
         val sig = slova(kusy)
         val ted = System.currentTimeMillis()
         // už zobrazené: iba obnoviť, keď preklady na TV po dvoch minútach vypršia
-        if (zobrazeno && podobne(sig, zobrazeneSlova)) {
+        if (podobne(sig, zobrazeneSlova)) {
             cakajuci = null
-            if (ted - poslanoKedy > 90_000 && posledneBloky.isNotEmpty()) {
+            if (zobrazeno && ted - poslanoKedy > 90_000 && posledneBloky.isNotEmpty()) {
                 poslanoKedy = ted
                 Propojeni.Vysilac.poslatBloky(posledneBloky, 120_000)
             }
@@ -168,41 +185,53 @@ object PrekladObrazovky {
         }
         val preklady = Gemini.prelozViac(kusy.map { it.text }, jazyk)
         Spotreba.pridaj("obrazovky")
-        val bloky = rozlozOkno(kusy, preklady)
+        fun cisty(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+        // vynechať to, čo model označil za zbytočné (prázdne), a to, čo sa nezmenilo (mená, názvy)
+        val pary = kusy.indices.filter { preklady[it].isNotBlank() && cisty(preklady[it]) != cisty(kusy[it].text) }
+            .map { kusy[it] to preklady[it] }
+        zobrazeneSlova = sig
+        if (pary.isEmpty()) {
+            if (zobrazeno) {
+                zobrazeno = false; posledneBloky = emptyList()
+                Propojeni.Vysilac.poslatBloky(emptyList(), 1000)
+            }
+            return
+        }
+        val bloky = rozlozOkno(pary)
         if (Propojeni.Vysilac.poslatBloky(bloky, 120_000)) {
-            zobrazeno = true; zobrazeneSlova = sig; posledneBloky = bloky; poslanoKedy = System.currentTimeMillis()
+            zobrazeno = true; posledneBloky = bloky; poslanoKedy = System.currentTimeMillis()
         }
     }
 
-    /** Okno vedľa pôvodného textu: svetlý panel s bublinami, ako v GlossaSub. */
-    private fun rozlozOkno(kusy: List<Kus>, preklady: List<String>): List<Propojeni.Vysilac.Blok> {
+    /**
+     * Okno vedľa pôvodného textu: úzke bubliny. Správy, ktoré dostávam, majú svetlosivý podklad
+     * a biele písmo, moje svetlomodrý podklad a biele písmo, všetky s čiernym orámovaním.
+     */
+    private fun rozlozOkno(pary: List<Pair<Kus, String>>): List<Propojeni.Vysilac.Blok> {
+        val kusy = pary.map { it.first }
         val ul = kusy.minOf { it.l }; val ur = kusy.maxOf { it.r }; val ut = kusy.minOf { it.t }
-        val volneVlavo = ul; val volneVpravo = 1f - ur
         val sirka = SIRKA_OKNA
-        val x = if (volneVlavo >= volneVpravo) maxOf(0.02f, minOf(ul - sirka - 0.015f, 0.4f)).coerceAtLeast(0.02f)
-                else minOf(1f - sirka - 0.02f, maxOf(ur + 0.015f, 0.6f))
+        val x = if (ul >= 1f - ur) maxOf(0.02f, ul - sirka - 0.012f)
+                else minOf(1f - sirka - 0.02f, ur + 0.012f)
         val vrch = ut.coerceIn(0.06f, 0.30f)
-        // odhad výšky bubliny: ~30 px písmo, riadky podľa šírky okna (obraz 1920 × 1080)
-        val znakovNaRiadok = (sirka * 1920f * 0.9f / (30f * 0.52f)).toInt().coerceAtLeast(12)
-        val vysky = preklady.map { t ->
+        val znakovNaRiadok = (sirka * 1920f * 0.88f / (PISMO_PX * 0.52f)).toInt().coerceAtLeast(12)
+        val vysky = pary.map { (_, t) ->
             val riadkov = Math.ceil(t.length.toDouble() / znakovNaRiadok).toInt().coerceAtLeast(1)
-            ((riadkov * 30f * 1.2f + 26f) / 1080f)
+            (riadkov * PISMO_PX * 1.15f + 12f) / 1080f
         }
-        val medzera = 0.012f
+        val medzera = 0.008f
         var spolu = vysky.sum() + medzera * (vysky.size - 1)
-        val maxVyska = 0.86f - vrch
+        val maxVyska = 0.88f - vrch
         val mierka = if (spolu > maxVyska) maxVyska / spolu else 1f
-        spolu *= mierka
-        val spodok = vrch + spolu + 0.05f
+        val cierna = 0xFF000000.toInt(); val biela = 0xFFFFFFFF.toInt()
         val vysl = ArrayList<Propojeni.Vysilac.Blok>()
-        vysl.add(Propojeni.Vysilac.Blok(x, vrch - 0.02f, x + sirka, spodok, 0xF2EAF0FA.toInt(), 0xFF111827.toInt(), ""))
         var y = vrch
-        for ((i, t) in preklady.withIndex()) {
+        for ((i, par) in pary.withIndex()) {
             val v = vysky[i] * mierka
-            vysl.add(Propojeni.Vysilac.Blok(x + 0.012f, y, x + sirka - 0.012f, y + v, 0xFFD3D8E0.toInt(), 0xFF111827.toInt(), t))
+            val pozadie = if (par.first.moje) 0xFF6FB1F2.toInt() else 0xFF9AA3AF.toInt()
+            vysl.add(Propojeni.Vysilac.Blok(x, y, x + sirka, y + v, pozadie, biela, par.second, cierna))
             y += v + medzera * mierka
         }
-        vysl.add(Propojeni.Vysilac.Blok(x, spodok - 0.032f, x + sirka, spodok - 0.006f, 0x00000000, 0xFF7A8499.toInt(), "SlovakCaption · Slovenčina"))
         return vysl
     }
 

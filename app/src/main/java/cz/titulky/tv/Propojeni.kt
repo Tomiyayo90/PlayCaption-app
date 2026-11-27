@@ -388,7 +388,7 @@ object Propojeni {
         }
 
         /** Preložený text na obrazovke: poloha (0..1), farba pozadia a písma (ARGB). */
-        class Blok(val l: Float, val t: Float, val r: Float, val b: Float, val pozadie: Int, val pismo: Int, val text: String)
+        class Blok(val l: Float, val t: Float, val r: Float, val b: Float, val pozadie: Int, val pismo: Int, val text: String, val ramcek: Int = 0)
 
         /** Pošle televízii preklady, ktoré sa nakreslia presne na miesto pôvodného textu. Vráti false, ak nie je cieľ. */
         fun poslatBloky(bloky: List<Blok>, dobaMs: Long): Boolean {
@@ -401,7 +401,7 @@ object Propojeni {
             for (k in bloky) {
                 val text = k.text.replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n").replace("\t", " ").take(300)
                 val polozka = "\t" + cislo(k.l) + ";" + cislo(k.t) + ";" + cislo(k.r) + ";" + cislo(k.b) + ";" +
-                    farba(k.pozadie) + ";" + farba(k.pismo) + ";" + text
+                    farba(k.pozadie) + ";" + farba(k.pismo) + ";" + (if (k.ramcek != 0) "B" + farba(k.ramcek) + ";" else "") + text
                 if (pocet >= 48 || sb.toString().toByteArray(Charsets.UTF_8).size + polozka.toByteArray(Charsets.UTF_8).size > 7800) break
                 sb.append(polozka); pocet++
             }
