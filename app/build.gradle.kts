@@ -10,7 +10,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "cz.titulky.tv"
+        applicationId = "sk.tomiyayo.slovakcaption"
         minSdk = 26
         targetSdk = 34
         versionCode = 35
