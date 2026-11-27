@@ -104,6 +104,7 @@
                 node.style.height = ((block.area[3] - block.area[1]) * 100) + "%";
                 node.style.background = argb(block.bg);
                 node.style.color = argb(block.fg);
+                if (block.border) node.style.border = "2px solid " + argb(block.border);
                 node.textContent = block.text;
                 blocksBox.appendChild(node);
                 // Písmo se zmenšuje, dokud se text nevejde do rámečku.

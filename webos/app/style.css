@@ -70,7 +70,7 @@ body {
   align-items: center;
   font-weight: bold;
   line-height: 1.15;
-  border-radius: 4px;
+  border-radius: 14px;
 }
 .choice { padding: 8px 12px; border-radius: 6px; }
 .choice + .choice { margin-top: 4px; }
