@@ -159,24 +159,20 @@ object Gemini {
         return n
     }
 
-    /** Preklad textu z obrazovky (menu, ciele misií, mobil v hre) cez obrázok. */
-    fun obrazok(jpeg: ByteArray, jazyk: String): String {
-        val system = "You read screenshots of a video game. Find ALL meaningful on-screen text " +
-            "(menus, mission objectives, hints, in-game phone messages, map/GPS labels, subtitles) " +
-            "and translate it into ${nazovJazyka(jazyk)}. Return only the translation as short lines, " +
-            "no explanations. Skip logos and decoration. If there is no text, return a single dash.\n\n" +
-            "Game context:\n" + kontext(jazyk)
+    private fun posliObrazok(system: String, jpeg: ByteArray, otazka: String, json: Boolean, maxTokenov: Int): String {
         val img = JSONObject().put("inlineData", JSONObject().put("mimeType", "image/jpeg")
             .put("data", android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP)))
+        val konfig = JSONObject().put("temperature", 0.2).put("maxOutputTokens", maxTokenov)
+        if (json) konfig.put("responseMimeType", "application/json")
         val telo = JSONObject()
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             .put("contents", JSONArray().put(JSONObject().put("role", "user")
-                .put("parts", JSONArray().put(img).put(JSONObject().put("text", "Translate the text on this screen.")))))
-            .put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", 600))
+                .put("parts", JSONArray().put(img).put(JSONObject().put("text", otazka)))))
+            .put("generationConfig", konfig)
         val s = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
             .openConnection() as HttpURLConnection
         try {
-            s.connectTimeout = 6000; s.readTimeout = 25000
+            s.connectTimeout = 6000; s.readTimeout = 40000
             s.requestMethod = "POST"; s.doOutput = true
             s.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
             s.setRequestProperty("x-goog-api-key", klic)
@@ -189,8 +185,54 @@ object Gemini {
                 .getJSONObject("content").getJSONArray("parts")
             val sb = StringBuilder()
             for (i in 0 until casti.length()) sb.append(casti.getJSONObject(i).optString("text", ""))
-            return sb.toString().trim().ifEmpty { "-" }
+            return sb.toString().trim()
         } finally { s.disconnect() }
+    }
+
+    /** Text z obrazovky s polohou: súradnice sú podiel šírky/výšky obrazu (0..1). */
+    class Textik(val l: Float, val t: Float, val r: Float, val b: Float, val text: String)
+
+    /** Preklad textu z obrazovky (menu, ciele misií, mobil v hre) cez obrázok – iba text. */
+    fun obrazok(jpeg: ByteArray, jazyk: String): String {
+        val system = "You read screenshots of a video game. Find ALL meaningful on-screen text " +
+            "(menus, mission objectives, hints, in-game phone messages, map/GPS labels, subtitles) " +
+            "and translate it into ${nazovJazyka(jazyk)}. Return only the translation as short lines, " +
+            "no explanations. Skip logos and decoration. If there is no text, return a single dash.\n\n" +
+            "Game context:\n" + kontext(jazyk)
+        return posliObrazok(system, jpeg, "Translate the text on this screen.", false, 600).ifEmpty { "-" }
+    }
+
+    /**
+     * Preklad textov z obrazovky spolu s ich polohou, aby sa dali nakresliť presne na pôvodné miesto.
+     * Dialógové titulky v spodnej časti obrazu sa preskakujú (tie rieši bežný preklad titulkov).
+     */
+    fun obrazokBoxy(jpeg: ByteArray, jazyk: String): List<Textik> {
+        val system = "You read screenshots of a video game and translate on-screen text into ${nazovJazyka(jazyk)}.\n" +
+            "Return ONLY a JSON array. Each element is one text block (one menu row, one tab label, one paragraph " +
+            "of a phone message, one objective line, one button hint) as an object: " +
+            "{\"box_2d\": [ymin, xmin, ymax, xmax], \"text\": \"translation\"}. " +
+            "box_2d is the tight box around the ORIGINAL text, with coordinates normalized to 0-1000. " +
+            "Keep each translation short and natural; keep names, numbers, codes and brand names unchanged. " +
+            "Skip: dialogue subtitles at the bottom centre of the screen, logos, car or street graffiti, " +
+            "text that is part of the 3D scene, and anything already in ${nazovJazyka(jazyk)}. " +
+            "If there is no text to translate, return [].\n\nGame context:\n" + kontext(jazyk)
+        var odp = posliObrazok(system, jpeg, "Translate the on-screen text and return the JSON array.", true, 4000)
+        odp = odp.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        val od = odp.indexOf('['); val do_ = odp.lastIndexOf(']')
+        if (od < 0 || do_ <= od) throw IllegalStateException("Neplatná odpoveď: " + odp.take(120))
+        val pole = JSONArray(odp.substring(od, do_ + 1))
+        val vysl = ArrayList<Textik>()
+        for (i in 0 until pole.length()) {
+            val o = pole.optJSONObject(i) ?: continue
+            val b = o.optJSONArray("box_2d") ?: o.optJSONArray("box") ?: continue
+            val text = o.optString("text", "").trim()
+            if (b.length() < 4 || text.isEmpty()) continue
+            val y0 = (b.optDouble(0) / 1000.0).toFloat(); val x0 = (b.optDouble(1) / 1000.0).toFloat()
+            val y1 = (b.optDouble(2) / 1000.0).toFloat(); val x1 = (b.optDouble(3) / 1000.0).toFloat()
+            if (x1 <= x0 || y1 <= y0) continue
+            vysl.add(Textik(x0, y0, x1, y1, text))
+        }
+        return vysl
     }
 
     fun nazovJazyka(kod: String): String = when (kod) {

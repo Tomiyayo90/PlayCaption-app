@@ -387,6 +387,29 @@ object Propojeni {
             posliData { "$OBLAST\t${if (ukazat) 1 else 0}\t${o[0]}\t${o[1]}\t${o[2]}\t${o[3]}".toByteArray(Charsets.UTF_8) }
         }
 
+        /** Preložený text na obrazovke: poloha (0..1), farba pozadia a písma (ARGB). */
+        class Blok(val l: Float, val t: Float, val r: Float, val b: Float, val pozadie: Int, val pismo: Int, val text: String)
+
+        /** Pošle televízii preklady, ktoré sa nakreslia presne na miesto pôvodného textu. Vráti false, ak nie je cieľ. */
+        fun poslatBloky(bloky: List<Blok>, dobaMs: Long): Boolean {
+            if (cilIp == null) return false
+            val id = System.currentTimeMillis()
+            fun cislo(v: Float) = String.format(java.util.Locale.US, "%.4f", v.coerceIn(0f, 1f))
+            fun farba(c: Int) = (c.toLong() and 0xFFFFFFFFL).toString()
+            val sb = StringBuilder("PCB1\t").append(id).append('\t').append(dobaMs.coerceIn(1000L, 120000L))
+            var pocet = 0
+            for (k in bloky) {
+                val text = k.text.replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n").replace("\t", " ").take(300)
+                val polozka = "\t" + cislo(k.l) + ";" + cislo(k.t) + ";" + cislo(k.r) + ";" + cislo(k.b) + ";" +
+                    farba(k.pozadie) + ";" + farba(k.pismo) + ";" + text
+                if (pocet >= 48 || sb.toString().toByteArray(Charsets.UTF_8).size + polozka.toByteArray(Charsets.UTF_8).size > 7800) break
+                sb.append(polozka); pocet++
+            }
+            val data = sb.toString().toByteArray(Charsets.UTF_8)
+            posliData { data }
+            return true
+        }
+
         fun nastavTrvaleOblast(ano: Boolean) {
             synchronized(zamek) { trvaleOblast = ano; cisloVoleb++ }
             posliData { zpravaVoleb() }
